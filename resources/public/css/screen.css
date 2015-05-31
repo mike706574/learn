@@ -1,10 +1,127 @@
-body {
-    color: #555;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: 13px;
+/* home picture */
+
+#home-picture {
+    background: #FFFFFF url("../img/calvin_wrap.png");
+    height: 650px;
+    padding: 100px 20px 0;
+    position: relative;
+    text-align: left;
 }
 
-h1 {
-    text-align: center;
+@media screen and (max-width: 768px) {
+    #home-picture {
+        padding: 40px 5px 30px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    #home-picture {
+        height: 500px;
+    }
+}
+
+#home-picture h1 {
+    color: #000;
+    font-size: 4em;
+    font-weight: 500;
+    line-height: 100%;
+    margin-bottom: 0;
+}
+
+@media screen and (max-width: 768px) {
+    #home-picture h1 {
+        font-size: 50px;
+    }
+}
+
+#home-picture h4 {
+    color: #fff;
+    font-size: 1.35em;
+    font-weight: 300;
+}
+
+#home-picture h3 {
+    color: #fff;
+}
+
+@media screen and (max-width: 768px) {
+    #home-picture h3 {
+        font-size: 18px;
+        line-height: 28px;
+    }
+}
+
+/* top-bar */
+
+.top-bar {
+    background-color: #160d14;
+}
+
+.top-bar-section li:not(.has-form) a:not(.button) {
+    background-color: #160d14;
+}
+
+.top-bar-section li:hover:not(.has-form) a:not(.button) {
+    background-color: #8e7a85;
+    color: #fff;
+}
+
+.top-bar-section .dropdown li:not(.has-form):not(.active) > a:not(.button) {
+    background-color: #160d14;
+}
+
+.top-bar-section .dropdown li:hover:not(.has-form):not(.active) > a:not(.button) {
+    background-color: #b5876d;
+}
+
+/* sneaky snake section */
+
+.snake {
+    background-color: #29182b;
+    height: auto;
+    padding: 15px 0;
+}
+.snake h3, .apps-promo p {
+    color: white;
+}
+.snake h3 {
+    margin: 0;
+}
+.snake p {
+    margin-bottom: 0;
+}
+.snake .button {
+    margin: 0.5rem 0 0;
+}
+
+/* fun ferret footer */
+
+.ferret {
+    color: white;
+    background: #160d14 none repeat scroll 0 0;
+    height: auto;
+    padding: 15px 0;
+}
+
+.ferret h3, ferret p {
+    color: white;
+}
+
+.ferret h3 {
+    margin: 0;
+}
+
+.ferret p {
+    margin-bottom: 0;
+}
+
+.ferret .button {
+    margin: 0.5rem 0 0;
+}
+
+/* misc */
+
+.bold-font {
+    font-weight: bold !important;
 }
 

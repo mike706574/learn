@@ -1,7 +1,7 @@
-(ns cereal.test.handler
+(ns mike.test.handler
   (:use clojure.test
         ring.mock.request
-        cereal.handler))
+        mike.handler))
 
 (deftest test-app
   (testing "main route"

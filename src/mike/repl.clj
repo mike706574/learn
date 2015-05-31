@@ -1,5 +1,5 @@
-(ns cereal.repl
-  (:use cereal.handler
+(ns mike.repl
+  (:use mike.handler
         ring.server.standalone
         [ring.middleware file-info file]))
 
