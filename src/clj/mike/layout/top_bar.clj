@@ -12,6 +12,7 @@
 (defmethod top-bar-item :link-dropdown
   [{:keys [label href items]}]
   [:li.has-dropdown.not-click
+   ;; THIS SHOULD NOT BE A LINK
    [:a.bold-font {:href href} label]
    [:ul.dropdown
     (map link-dropdown-item items)]])

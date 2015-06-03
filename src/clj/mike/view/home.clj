@@ -1,4 +1,4 @@
-(ns mike.views.home
+(ns mike.view.home
   (:require [compojure.core :refer [defroutes GET]]
             [mike.layout.core :as layout]))
 
@@ -34,8 +34,4 @@
     [:div.large-6.columns
      [:h4 "This is the same paragraph of nonsense"]
      [:p nonsense-paragraph]]]
-   [:hr]
-   (layout/snake-section {:id :snake2
-                          :heading "This is another heading!"
-                          :paragraph "This is the top part of the footer."})))
-
+   [:hr]))

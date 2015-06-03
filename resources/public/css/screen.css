@@ -20,34 +20,49 @@
     }
 }
 
-#home-picture h1 {
-    color: #000;
-    font-size: 4em;
-    font-weight: 500;
-    line-height: 100%;
-    margin-bottom: 0;
+/* thing thing */
+
+/* start tiny */
+#thing {
+    height: 400px;
+    padding: 150px 25px;
+    position: relative;
+    text-align: left;
 }
 
-@media screen and (max-width: 768px) {
-    #home-picture h1 {
-        font-size: 50px;
+#thing h1 {
+    color: #000;
+    font-size: 2em;
+    font-weight: 500;
+    line-height: 100%;
+    margin-bottom: 40px;
+}
+
+@media screen and (min-width: 480px) {
+    #thing h1 {
+        color: red;
+        font-size: 2.5em;
     }
 }
 
-#home-picture h4 {
-    color: #fff;
-    font-size: 1.35em;
-    font-weight: 300;
+@media screen and (min-width: 768px) {
+    #thing {
+        height: 550px;
+        padding: 200px 25px;
+    }
+    #thing h1 {
+        color: green;
+        font-size: 4.0em;
+    }
 }
 
-#home-picture h3 {
-    color: #fff;
-}
-
-@media screen and (max-width: 768px) {
-    #home-picture h3 {
-        font-size: 18px;
-        line-height: 28px;
+@media screen and (min-width: 1024px) {
+    #thing {
+        height: 600px;
+    }
+    #thing h1 {
+        color: blue;
+        font-size: 4.0em;
     }
 }
 
@@ -125,3 +140,6 @@
     font-weight: bold !important;
 }
 
+.centered-text {
+    text-align: center;
+}
