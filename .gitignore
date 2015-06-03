@@ -11,3 +11,4 @@ pom.xml
 .lein-env
 .nrepl-port
 resources/config.edn
+resources/app.js
