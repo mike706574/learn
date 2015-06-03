@@ -1,19 +1,11 @@
-# cereal
+# mike
 
-FIXME
+clojure playground
 
-## Prerequisites
+## Building and running
 
-You will need [Leiningen][1] 1.7.0 or above installed.
-
-[1]: https://github.com/technomancy/leiningen
-
-## Running
-
-To start a web server for the application, run:
-
-    lein ring server
+figure it out
 
 ## License
 
-Copyright © 2015 FIXME
+i'm 12 so i don't have a license
