@@ -1,7 +1,7 @@
 (ns mike.sentence.database
   (:require [mike.sentence.api :refer [SentenceRepo] :as api]
             [clojure.java.jdbc :as db]
-            [clojure.core.async :refer [chan go >! <! <!!]]))
+            [clojure.core.async :refer [go]]))
 
 (def italian-key :italian_sentence)
 
@@ -19,15 +19,16 @@
   (first (random-sentences config table-key 1)))
 
 (defn- async-random-sentence
-  [config table-key channel]
-  (println "Asyncronously fetching random sentence")
-  (go (Thread/sleep 10000)
-      (let [random-sentence (random-sentence config table-key)]
-        (println (str "I got " random-sentence ", putting it on the channel now"))
-        (>! channel random-sentence))))
-  
+  [config table-key]
+  (go (random-sentence config table-key)))
+
+(defn- async-random-sentences
+  [config table-key n]
+  (go (random-sentences config table-key n)))
+
 (defrecord DatabaseSentenceRepo [config]
   SentenceRepo
   (get-random-sentence [_] (random-sentence config italian-key))
-  (aget-random-sentence [_ channel] (async-random-sentence config italian-key channel))
-  (get-random-sentences [_ n] (random-sentences config italian-key n)))
+  (get-random-sentences [_ n] (random-sentences config italian-key n))
+  (aget-random-sentence [_] (async-random-sentence config italian-key channel))
+  (aget-random-sentence [_] (async-random-sentence config italian-key channel)))
