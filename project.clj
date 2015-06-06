@@ -12,7 +12,8 @@
                  [reagent "0.5.0"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]]
   :plugins [[lein-ring "0.8.12"]
-            [lein-cljsbuild "1.0.6"]]
+            [lein-cljsbuild "1.0.6"]
+            [lein-beanstalk "0.2.7"]]
   :ring {:handler mike.handler/app
          :init mike.handler/init
          :destroy mike.handler/destroy}
