@@ -1,4 +1,4 @@
-(ns cljs.mike.flip
+(ns mike.flip
   (:require [reagent.core :as reagent]))
 
 (defn app
