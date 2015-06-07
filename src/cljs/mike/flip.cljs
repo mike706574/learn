@@ -3,7 +3,10 @@
 
 (defn app
   []
-  [:h2 "Hello world!"])
+  [:section#thing
+   [:div.row
+    [:div.large-12.columns.centered-text
+     [:h1 "HELLO" ]]]])
 
 (defn start
   []

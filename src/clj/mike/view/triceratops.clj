@@ -1,6 +1,5 @@
 (ns mike.view.triceratops
-  (:require [mike.storage :as storage]
-            [mike.layout.core :as layout]))
+  (:require [mike.layout.core :as layout]))
 
 (defn triceratops
   []

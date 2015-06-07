@@ -22,12 +22,13 @@
   (println "mike is shutting down"))
 
 (def config-file (io/file (io/resource "config.edn")))
-(def config (edn/read-string (slurp data-file)))
+(def config (edn/read-string (slurp config-file)))
 (def sentence-repo (build-sentence-repo config))
 
 (defn sentence-resource
   []
   (response (api/get-random-sentence sentence-repo)))
+
 (defroutes app-routes
   (route/resources "/")
   (GET "/" [] (home))
