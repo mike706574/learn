@@ -4,7 +4,12 @@ clojure playground
 
 ## Building and running
 
-figure it out
+right now i use:
+
+lein cljsbuild once
+lein ring uberwar
+
+then i throw it on aws tomcat
 
 ## License
 
