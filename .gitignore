@@ -11,4 +11,11 @@ pom.xml
 .lein-env
 .nrepl-port
 resources/config.edn
-resources/app.js
+resources/public/js/app.js
+resources/public/js/cljs/
+resources/public/js/cljs_http/
+resources/public/js/clojure/
+resources/public/js/cognitect/
+resources/public/js/mike/
+resources/public/js/no/
+resources/public/js/reagent/

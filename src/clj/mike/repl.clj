@@ -1,6 +1,6 @@
 (ns mike.repl
+  (:require [ring.server.standalone :refer [serve]])
   (:use mike.handler
-        ring.server.standalone
         [ring.middleware file-info file]))
 
 (defonce server (atom nil))

@@ -25,7 +25,7 @@
      [:h4 "Here's some facts about animals:"]
      [:ul (map (fn [s] [:li s]) animal-facts)]]
     [:div.large-6.columns
-     [:img {:src "img/thierry-henry.jpg"}]]]
+     [:img {:src "https://dl.dropboxusercontent.com/u/74366453/images/thierry-henry.jpg"}]]]
    [:hr]
    [:div.row
     [:div.large-6.columns

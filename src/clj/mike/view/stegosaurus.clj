@@ -1,5 +1,5 @@
 (ns mike.view.stegosaurus
-  (:require [mike.sentence.api :as api]
+  (:require [lang.sentence.api :as api]
             [mike.layout.core :as layout]))
 
 (defn stegosaurus

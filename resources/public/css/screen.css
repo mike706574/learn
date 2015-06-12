@@ -1,7 +1,7 @@
 /* home picture */
 
 #home-picture {
-    background: #FFFFFF url("../img/calvin_wrap.png");
+    background: #FFFFFF url("https://dl.dropboxusercontent.com/u/74366453/images/calvin_wrap.png");
     height: 650px;
     padding: 100px 20px 0;
     position: relative;
@@ -24,8 +24,8 @@
 
 /* start tiny */
 #thing {
-    height: 400px;
-    padding: 150px 25px;
+    height: 250px;
+    padding: 95px 25px;
     position: relative;
     text-align: left;
 }
@@ -39,29 +39,34 @@
 }
 
 @media screen and (min-width: 480px) {
+    #thing {
+        height: 300px;
+        padding: 120px 25px;
+    }
     #thing h1 {
-        color: red;
+        color: black;
         font-size: 2.5em;
     }
 }
 
 @media screen and (min-width: 768px) {
     #thing {
-        height: 550px;
-        padding: 200px 25px;
+        height: 425px;
+        padding: 140px 25px;
     }
     #thing h1 {
-        color: green;
+        color: black;
         font-size: 4.0em;
     }
 }
 
 @media screen and (min-width: 1024px) {
     #thing {
-        height: 600px;
+        height: 500px;
+        padding: 185px 25px;
     }
     #thing h1 {
-        color: blue;
+        color: black;
         font-size: 4.0em;
     }
 }

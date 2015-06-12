@@ -3,4 +3,4 @@
 
 (defn triceratops
   []
-  (layout/js-app "Triceratops!" "js/app.js"))
+  (layout/js-app "Flashcards" "js/app.js"))
