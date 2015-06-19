@@ -10,14 +10,16 @@
                  [org.clojure/java.jdbc "0.3.7"]
                  ;; ws
                  [ring "1.4.0-RC1"]
-                 [ring/ring-json "0.3.1"]
                  [ring-server "0.4.0"]
+                 [ring/ring-json "0.3.1"]
+                 [ring/ring-defaults "0.1.5"]
                  [compojure "1.3.4"]
                  [hiccup "1.0.5"]
                  ;; cljs
                  [cljs-http "0.1.34"]
                  [org.clojure/clojurescript "0.0-3308"]
                  [reagent "0.5.0"]
+                 [reagent-forms "0.5.1"]
                  [org.clojars.pet/lang "0.0.1-SNAPSHOT"]]
   :plugins [[lein-ring "0.8.12"]
             [lein-cljsbuild "1.0.6"]
@@ -32,9 +34,10 @@
   :cljsbuild {:builds {:dev {:source-paths ["src/cljs"]
                              :compiler {:optimizations :none
                                         :output-to "resources/public/js/app.js"
-                                        :output-dir "resources/public/js/"
+                                        :output-dir "resources/public/js/out"
+                                        :asset-path "js/out"
                                         :pretty-print true
-                                        :source-map true}}
+                                        :source-map "resources/public/js/map.js.map"}}
                        :prod {:source-paths ["src/cljs"]
                               :compiler {:output-to "resources/public/js/app.js"
                                          :optimizations :advanced

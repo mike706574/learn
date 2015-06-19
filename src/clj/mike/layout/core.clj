@@ -60,6 +60,31 @@
     (include-js "js/vendor/jquery.js" "js/foundation.min.js")
     [:script "$(document).foundation();"]]))
 
+(defn reagent
+  [title app]
+  (html5
+   [:head
+    [:meta {:charset "utf-8"}]
+    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
+    [:title title]]
+   [:body
+    [:div#app]
+    [:script {:type "text/javascript" :src "/js/out/goog/base.js"}]
+    [:script {:type "text/javascript" :src "/js/app.js"}]
+    [:script {:type "text/javascript"} (str "goog.require(\"" app "\");")]
+    [:script {:type "text/javascript"} (str app ".start();")]]))
+
+(defn another-simple-js-app
+  [title path]
+  (html5
+   [:head
+    [:meta {:charset "utf-8"}]
+    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
+    [:title title]]
+   [:body
+    [:div#app]
+    (include-js path)]))
+
 (defn js-app
   [title path]
   (html5
