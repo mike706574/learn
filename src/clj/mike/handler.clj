@@ -5,9 +5,7 @@
             [hiccup.middleware :refer [wrap-base-url]]
             [compojure.handler :as handler]
             [compojure.route :as route]
-            [mike.resource.sentence :refer [language-resource
-                                            sentence-resource
-                                            sentences-resource]]
+            [mike.resource.sentence :refer resource]
             [mike.view :as view]
             [mike.layout.core :refer [reagent]]
             [mike.view.home :refer [home]]
@@ -24,20 +22,20 @@
 
 (def config-file (io/file (io/resource "test_config.edn")))
 (def config (edn/read-string (slurp config-file)))
-(def sentence-repo (build-sentence-repo config))
+(def repo (build-repo config))
 
 (defroutes app-routes
   (route/resources "/")
   (GET "/" [] (home))
-  (GET "/stegosaurus" [] (view/stegosaurus sentence-repo))
+  (GET "/stegosaurus" [] (view/stegosaurus repo))
   (GET "/triceratops" [] (view/triceratops))
   
   (GET "/lang/flash" [] (reagent "Flash" "mike.flash"))
   (GET "/lang/browse" [] (reagent "Browse" "mike.browse"))
 
-  (GET "/api/language"  {{id :id} :params} (language-resource sentence-repo id))
-  (GET "/api/sentence"  {params :params} (sentence-resource sentence-repo params))
-  (GET "/api/sentences" {params :params} (sentences-resource sentence-repo params))
+  (GET "/api/language"  {{id :id} :params} (resource/language repo id))
+  (GET "/api/sentence"  {params :params} (resource/sentence repo params))
+  (GET "/api/sentences" {params :params} (resource/sentences repo params))
   
   (route/not-found "Not Found"))
 
@@ -51,7 +49,7 @@
 ;;   (routing
 ;;    (route/resources "/")
 ;;    (GET "/" [] (home))
-;;    (GET "/stegosaurus" [] (partial stegosaurus (build-sentence-repo config)))
+;;    (GET "/stegosaurus" [] (partial stegosaurus (build-repo config)))
 ;;    (GET "/triceratops" [] (triceratops))
 ;;    (route/not-found "Not Found")))
 

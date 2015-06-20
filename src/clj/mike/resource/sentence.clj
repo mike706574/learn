@@ -21,44 +21,51 @@
    :body (json/write-str message)})
 
 (defn sid
-  [repo lp id]
-  (<!! (api/get-sentence repo (keyword lp) (Integer/parseInt id))))
+  [repo yak id]
+  (<!! (api/get-sentence repo (keyword yak) (Integer/parseInt id))))
 
 (defn srandom
-  [repo lp]
-  (<!! (api/get-random-sentence repo (keyword lp))))
+  [repo yak]
+  (<!! (api/get-random-sentence repo (keyword yak))))
+
 
 (defn srandoms
-  [repo lp n]
-  (<!! (api/get-random-sentences repo (keyword lp) (parse-int n))))
+  [repo yak n]
+  (<!! (api/get-random-sentences repo (keyword yak) (parse-int n))))
 
 (defn srange
-  [repo lp start end]
-  (<!! (api/get-sentence-range repo (keyword lp) (parse-int start) (parse-int end))))
+  [repo yak start end]
+  (<!! (api/get-sentence-range repo (keyword yak) (parse-int start) (parse-int end))))
 
 (defn language-resource
   [repo id]
   (if id
     (let [language (api/get-language id)
-          sentence-count (api/count-sentences repo lp)]
+          sentence-count (api/count-sentences repo yak)]
       (succeed (assoc info :sentence-count sentence-count)))
     (fail "NONONO")))
 
 (defn sentence-resource
-  [repo {:keys [lp id]}]
-  (if lp
+  [repo {:keys [yak id]}]
+  (if yak
     (if id
-      (succeed (sid repo lp id))
-      (succeed (srandom repo lp)))
+      (succeed (sid repo yak id))
+      (succeed (srandom repo yak)))
     (fail "MISSING LANGUAGE PAIR")))
 
-(defn sentences-resource
-  [repo {:keys [lp n start end]}]
-  (if lp
+(defn sentences
+  [repo {:keys [yak n start end]}]
+  (if yak
     (if n
-      (succeed (srandoms repo lp n))
+      (succeed (<!! (api/get-random-sentences
+                     repo
+                     (keyword yak)
+                     (parse-int n))))
       (if (and start end)
-        (succeed (srange repo lp start end))
+        (succeed (<!! (api/get-sentence-range
+                       repo
+                       (keyword yak)
+                       (parse-int start)(parse-int end))))
         (fail "BAD COMBINATION")))
     (fail "MISSING LANGUAGE PAIR")))
 
