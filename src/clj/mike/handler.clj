@@ -5,7 +5,7 @@
             [hiccup.middleware :refer [wrap-base-url]]
             [compojure.handler :as handler]
             [compojure.route :as route]
-            [mike.resource.sentence :refer resource]
+            [mike.resource.sentence :as resource]
             [mike.view :as view]
             [mike.layout.core :refer [reagent]]
             [mike.view.home :refer [home]]
@@ -22,7 +22,7 @@
 
 (def config-file (io/file (io/resource "test_config.edn")))
 (def config (edn/read-string (slurp config-file)))
-(def repo (build-repo config))
+(def repo (build-sentence-repo config))
 
 (defroutes app-routes
   (route/resources "/")

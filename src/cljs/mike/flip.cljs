@@ -43,7 +43,7 @@
   []
   (swap! state assoc :loading true)
   (println "HI MOM")
-  (go (let [response (<! (http/get path {:query-params {"lp" "en-it"}}))]
+  (go (let [response (<! (http/get path {:query-params {"yak" "en-it"}}))]
         (swap! state (partial new-sentence (:body response))))))
 
 (defn thing
