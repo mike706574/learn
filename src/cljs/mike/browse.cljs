@@ -48,7 +48,6 @@
   (let [{:keys [yak page-number page-sentences] :as current-state} @state
         yak-info (yaks yak)
         languages (:languages yak-info)]
-    (println languages)
     [:div
      [:select {:on-change #(show-page state (keyword (-> % .-target .-value)) 1)}
       (map language-option yaks)]
