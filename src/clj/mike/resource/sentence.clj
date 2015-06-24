@@ -38,15 +38,17 @@
   (<!! (api/get-sentence-range repo (keyword yak) (parse-int start) (parse-int end))))
 
 (defn language
-  [repo yak]
+  [repo {:keys [yak]}]
+  (println "LANGUAGE:" yak)
   (if yak
     (let [sentence-count (api/count-sentences repo yak)
           yak (yaks yak)]
       (succeed (assoc yak :sentence-count sentence-count)))
-    (fail "NONONO")))
+    (fail "Missing yak")))
 
 (defn sentence
   [repo {:keys [yak id]}]
+  (println "sentence")
   (if yak
     (if id
       (succeed (sid repo yak id))

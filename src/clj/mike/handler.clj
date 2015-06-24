@@ -27,13 +27,13 @@
 (defroutes app-routes
   (route/resources "/")
   (GET "/" [] (home))
-  (GET "/stegosaurus" [] (view/stegosaurus repo))
-  (GET "/triceratops" [] (view/triceratops))
+;;  (GET "/stegosaurus" [] (view/stegosaurus repo))
+;;  (GET "/triceratops" [] (view/triceratops))
   
   (GET "/lang/flash" [] (reagent "Flash" "mike.flash"))
   (GET "/lang/browse" [] (reagent "Browse" "mike.browse"))
 
-  (GET "/api/language"  {{id :id} :params} (resource/language repo id))
+  (GET "/api/language"  {params :params} (resource/language repo params))
   (GET "/api/sentence"  {params :params} (resource/sentence repo params))
   (GET "/api/sentences" {params :params} (resource/sentences repo params))
   
