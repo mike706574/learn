@@ -15,13 +15,13 @@
    "Mike's Home"
    [:section#home-picture]
    (layout/snake-section {:id :snake1
-                          :heading "This is a heading!"
-                          :paragraph "This is right under the big picture."})
+                          :heading "This is a website."
+                          :paragraph "There is nothing on it. Please leave."})
    [:hr]
    [:div.row
     [:div.large-6.columns
      [:h4 "What is this?"]
-     [:p what-is-this]
+     [:p nonsense-paragraph]
      [:h4 "Here's some facts about animals:"]
      [:ul (map (fn [s] [:li s]) animal-facts)]]
     [:div.large-6.columns

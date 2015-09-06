@@ -4,16 +4,11 @@
             [clojure.string :refer [trim join]]))
 
 (def dinosaur-links
-  [{:label "Stegosaurus" :href "/stegosaurus"}
-   {:label "Triceratops" :href "/triceratops"}])
-
-(def tool-links
-  [{:label "Shovel" :href "/shovel"}
-   {:label "Bucket" :href "/bucket"}])
+  [{:label "Flash" :href "/lang/flash"}
+   {:label "Browse" :href "/lang/browse"}])
 
 (def top-bar-items
-  [{:type :link-dropdown :label "Dinosaurs" :href "/dinosaurs" :items dinosaur-links}
-   {:type :link-dropdown :label "Tools" :href "/tools" :items tool-links }])
+  [{:type :link-dropdown :label "Things" :href "#" :items dinosaur-links}])
 
 (defn snake-section
   [{:keys [id heading paragraph] :or {label nil-text href nil-text}}]
@@ -61,6 +56,20 @@
     [:script "$(document).foundation();"]]))
 
 (defn reagent
+  [title filename app]
+  (html5
+   [:head
+    [:meta {:charset "utf-8"}]
+    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
+    [:title title]]
+   [:body
+    [:div#app]
+    [:script {:type "text/javascript" :src (str "/js/" filename "/goog/base.js")}]
+    [:script {:type "text/javascript" :src (str "/js/" filename ".js")}]
+    [:script {:type "text/javascript"} (str "goog.require(\"" app  ".core\");")]
+    [:script {:type "text/javascript"} (str app ".core.start();")]]))
+
+(defn reagent-prod
   [title app]
   (html5
    [:head
@@ -69,10 +78,7 @@
     [:title title]]
    [:body
     [:div#app]
-    [:script {:type "text/javascript" :src "/js/out/goog/base.js"}]
-    [:script {:type "text/javascript" :src "/js/app.js"}]
-    [:script {:type "text/javascript"} (str "goog.require(\"" app "\");")]
-    [:script {:type "text/javascript"} (str app ".start();")]]))
+    [:script {:type "text/javascript" :src (str "/js/" app ".js")}]]))
 
 (defn another-simple-js-app
   [title path]

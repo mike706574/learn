@@ -19,6 +19,26 @@
                     :join true}))
     (println (str "You can view the site at http://localhost:" port))))
 
-(defn stop-server []
+(defn get-first-index
+  [item coll]
+  (first (keep-indexed #(when (= item %2) %1) coll))) 
+
+(defn get-after
+  [item v]
+  (let [index (get-first-index item v)]
+    (if (nil? index)
+      nil
+      (let [next-index (inc index)]
+        (if (= next-index (count v))
+          (first v)
+          (get v next-index))))))
+
+(defn get-next
+  [element s]
+  (into [] s)
+
+  )
+
+(defn stop-server [] 
   (.stop @server)
   (reset! server nil))

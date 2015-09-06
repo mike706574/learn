@@ -1,14 +1,22 @@
 (ns mike.test.handler
   (:use clojure.test
-        ring.mock.request
-        mike.handler))
+        ring.mock.request)
+  (:require [lang.sentence.api :as api]
+            [lang.sentence.jdbc :as jdbc])
+  (:import [lang.sentence.jdbc JdbcSentenceRepo]))
 
-(deftest test-app
-  (testing "main route"
-    (let [response (app (request :get "/"))]
-      (is (= (:status response) 200))
-      (is (.contains (:body response) "Hello World"))))
+(def config {:sentence-repo-type :jdbc
+             :sentence-repo-database {:subprotocol "mysql"
+                                      :subname "//localhost:3306/lang"
+                                      :user "lang"
+                                      :password "lang"}})
 
-  (testing "not-found route"
-    (let [response (app (request :get "/invalid"))]
-      (is (= (:status response) 404)))))
+(def repo (JdbcSentenceRepo. (:sentence-repo-database config)))
+
+(defn thing
+  []
+  (api/count-sentences repo :en-it))
+
+(deftest test-thing
+  (testing "test ok"
+    (is (= {} (thing)))))
