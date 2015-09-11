@@ -38,7 +38,8 @@
   (let [{:keys [title sentence selected loading] :as current-state} @state]
     [:div 
      (when (not (nil? sentence))
-       [:div 
+       [:div
+        [:span (name selected) ]
         (joe/yak-select #(do (choose-set (keyword (joe/get-value %)) state) 
                              (fetch-sentence state)))
         (joe/flip-box title selected sentence #(swap! state swap-selection) #(fetch-sentence state))])

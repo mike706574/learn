@@ -66,30 +66,38 @@
 
   (GET "/lang/flash" [] (reagent "Flash" "flash" "mike.flash"))
   (GET "/lang/browse" [] (reagent "Browse" "browse" "mike.browse"))
-
+  (GET "/lang/exp" [] (reagent "Exp" "exp" "mike.exp"))
+  (GET "/lang/ferret" [] (reagent "Ferret" "ferret" "mike.ferret"))
+  
   (GET "/api/language" {{yak :yak} :params} (to-response
                                              (let [sentence-count (:body (<!! (api/count-sentences repo yak)))
                                                    yakin (api/yaks (keyword yak))
                                                    body (assoc  yakin :sentence-count sentence-count)]
                                                {:status :ok :body body})))
   
-  (GET "/api/sentence" {{yak :yak} :params} (to-response (<!! (api/get-random-sentence repo yak))))
-  (GET "/api/sentences" {{:keys [yak n start end]} :params}
+  (GET "/api/sentence" {{yak :yak id :id tag :tag} :params}
+       (let [c (if (nil? id)
+                 (if tag
+                   (api/get-tagged-random-sentence repo yak tag)
+                   (api/get-random-sentence repo yak))
+                 (api/get-sentence repo yak id))]
+         (to-response (<!! c))))
+  (GET "/api/sentences" {{:keys [yak n start end tag]} :params}
        (to-response
         (if n
-          (<!! (api/get-random-sentences
-                         repo
-                         (keyword yak)
-                         (parse-int n)))
+          (if tag
+            (<!! (api/get-tagged-random-sentences repo (keyword yak) tag (parse-int n)))
+            (<!! (api/get-random-sentences repo (keyword yak) (parse-int n)))) 
           (if (and start end)
-            (<!! (api/get-sentence-range
-                  repo
-                  (keyword yak)
-                  (parse-int start)(parse-int end)))
-            {:status :bad-request :message "BAD COMBINATION"}))))
+            (<!! (api/get-sentence-range repo (keyword yak) (parse-int start) (parse-int end)))
+            (if tag
+              (<!! (api/get-tagged-sentences repo yak tag))
+              {:status :bad-request :message "BAD COMBINATION"})))))
   
-  (GET "/api/tag" {{yak :yak tag :tag} :params} (to-response (<!! (api/get-tagged-sentences repo yak tag))))
-  (POST "/api/tag" {{yak :yak id :id tag :tag} :body} (to-response (<!! (api/tag-sentence repo yak id tag))))
+  (GET "/api/tag" {{yak :yak tag :tag} :params} (to-response (<!! (api/get-tagged-sentences repo (keyword yak) tag))))
+  (POST "/api/tag" {{yak :yak tag :tag id :id} :params}
+        (to-response (<!! (api/tag-sentence repo (keyword yak) id tag))))
+  (GET "/api/tags" {{yak :yak} :params} (to-response (<!! (api/get-tags repo yak))))
    
   (route/not-found "Not Found"))
 

@@ -57,4 +57,24 @@
                                                :optimizations :advanced
                                                :pretty-print false
                                                :output-wrapper false
-                                               :closure-warnings {:non-standard-jsdoc :off}}}}})
+                                               :closure-warnings {:non-standard-jsdoc :off}}}
+                       :exp-dev {:source-paths ["src/cljc" "src/cljs" "src/cljs/mike/exp" ]
+                                   :compiler {:optimizations :none
+                                              :output-to "resources/public/js/exp.js"
+                                              :output-dir "resources/public/js/exp"
+                                              :asset-path "js/out"
+                                              :pretty-print true
+                                              :source-map true}}
+                       :ferret-dev {:source-paths ["src/cljc" "src/cljs" "src/cljs/mike/ferret" ]
+                                   :compiler {:optimizations :none
+                                              :output-to "resources/public/js/ferret.js"
+                                              :output-dir "resources/public/js/ferret"
+                                              :asset-path "js/out"
+                                              :pretty-print true
+                                              :source-map true}}
+
+                       }
+
+              }
+
+  )
