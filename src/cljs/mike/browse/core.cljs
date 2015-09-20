@@ -4,9 +4,12 @@
             [lang.sentence.api :as api :refer [yaks]]
             [reagent.core :as reagent]
             [cljs-http.client :as http]
-            [cljs.core.async :refer [<!]])) 
+            [cljs.core.async :refer [<!]]
+            [lang.sentence.http :refer [HttpSentenceRepo]])) 
 
 (enable-console-print!)
+
+(def repo (HttpSentenceRepo. "http://localhost:8080/api/"))
 
 (defn load-page
   [yak number sentences sentence-count state]
@@ -23,7 +26,7 @@
     (let [page-size (:page-size @state)
           start (+ number (* (dec number) (dec page-size)))
           end (dec (+ start page-size)) 
-          response (<! (joe/get-sentence-range yak start end))
+          response (<! (api/get-sentence-range repo yak start end))
           sentences (:body response)]
       (swap! state (partial load-page yak number sentences sentence-count)))))
 
@@ -34,8 +37,9 @@
 (defn show-page-new-yak
   [state yak number]
   (go
-    (let [response (<! (joe/get-language yak))]
-      (show-page-hey state yak number (:sentence-count (:body response))))))
+    (let [response (:body (<! (api/get-language repo yak)))]
+      (println "COUNT: " (:count response))
+      (show-page-hey state yak number (:count response)))))
 
 (defn column-header
   [column]
@@ -52,25 +56,33 @@
     [:tr {:key sentence-id}
      (cons [:td {:key :id} sentence-id] (map (partial sentence-cell sentence) languages))]))
 
+(defn get-page-count
+  [sentence-count page-size]
+  (let [q (quot sentence-count page-size)
+        m (mod sentence-count page-size)]
+    (if (not= 0 m) (inc q) q)))
+
 (defn render
   [state]
   (let [{:keys [yak info page-number page-sentences page-size loading sentence-count] :as current-state} @state
         languages (:languages info)
-        page-count (quot sentence-count page-size)]
-    [:div
-     (joe/yak-select #(show-page-new-yak state (keyword (-> % .-target .-value)) 1))
-     [:h2 (:name info)]
-     [:p (str "Total sentences: " sentence-count)]
-     [:p (str "Page " page-number " of " (quot sentence-count page-size))]
-     [:table
-      [:thead
-       [:tr
-        (cons [:th {:key :id} "ID"] (map column-header languages))]]
-      [:tbody
-       (map (partial sentence-row languages) page-sentences)]]
-     (println "HI")
-     (joe/navigation-buttons page-number page-count (partial show-page state yak))
-     (when loading [:span "Loading..."])]))
+        page-count (get-page-count sentence-count page-size)]
+      [:div
+       (joe/yak-select #(show-page-new-yak state (keyword (-> % .-target .-value)) 1))
+       [:h2 (:name info)]
+       (if (= 0 page-count)
+         [:p "No sentences stored."]
+         [:div
+          [:p (str "Total sentences: " sentence-count)]
+          [:p (str "Page " page-number " of " (quot sentence-count page-size))]
+          [:table
+           [:thead
+            [:tr
+          (cons [:th {:key :id} "ID"] (map column-header languages))]]
+           [:tbody
+            (map (partial sentence-row languages) page-sentences)]]
+          (joe/navigation-buttons page-number page-count (partial show-page state yak))])
+       (when loading [:span "Loading..."])]))
 
 (defn app
   []

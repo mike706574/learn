@@ -9,6 +9,8 @@
 
 (enable-console-print!)
 
+(def repo (HttpSentenceRepo. "http://localhost:8080/api/"))
+
 (def history (atom []))
 
 (def state (reagent/atom {:loading false :tag "" :tag-message ""}))
@@ -44,7 +46,7 @@
   [state]
   (swap! state assoc :loading true)
   (go (let [yak (:yak @state)
-            sentence (<! (joe/get-random-sentence yak))]
+            sentence (<! (api/get-random-sentence repo yak))]
         (swap! state assoc :sentence sentence :loading false :tag-message "")
         (swap! history conj @state))))
 
@@ -73,7 +75,7 @@
 (defn tag-sentence
   [state]
   (go (let [{:keys [yak tag sentence]} @state 
-            {:keys [status message]} (<! (joe/tag-sentence yak tag (:id sentence)))
+            {:keys [status message]} (<! (api/tag-sentence repo yak tag (:id sentence)))
             message (build-message status "Added tag" message)]
         (swap! state assoc :tag-message message))))
 

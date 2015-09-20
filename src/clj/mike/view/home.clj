@@ -10,6 +10,29 @@
                    "Almost half the pigs in the world are kept by farmers in China."
                    "To escape the grip of a crocodile’s jaw, push your thumb into its eyeballs - it will let you go instantly."])
 
+(defn head
+  [title]
+  [:head
+    [:meta {:charset "utf-8"}]
+    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
+    [:title title]
+    (include-css "css/normalize.css" "css/foundation.min.css" "css/screen.css")
+    (include-js "js/vendor/modernizr.js")])
+
+(defn common
+  [title & body]
+  (html5
+   (head title)
+   [:body
+    (top-bar title top-bar-items)
+    body 
+    (footer-top)
+    (footer-bottom)
+    (include-js "js/vendor/jquery.js" "js/foundation.min.js")
+    [:script "$(document).foundation();"]]))
+
+
+    
 (defn home []
   (layout/common
    "Mike's Home"

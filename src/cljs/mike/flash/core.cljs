@@ -5,14 +5,17 @@
             [reagent.core :as reagent]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
-            [mike.frog :as frog]))
+            [mike.frog :as frog]
+            [lang.sentence.http :refer [HttpSentenceRepo]]))
 
 (enable-console-print!)
+
+(def repo (HttpSentenceRepo. "http://localhost:8080/api/"))
 
 (def state (reagent/atom {:loading false}))
 
 (defn choose-set
-  [yak state]
+  [yak state]o
   (let [{languages :languages title :name} (yaks yak)
         keys (mapv :key languages)]
     (swap! state merge {:yak yak
@@ -25,7 +28,7 @@
   [state]
   (swap! state assoc :loading true)
   (go (let [yak (:yak @state)
-            sentence (<! (joe/get-random-sentence yak))]
+            sentence (<! (api/get-random-sentence repo yak))]
         (swap! state assoc :sentence sentence :loading false))))
 
 (defn swap-selection

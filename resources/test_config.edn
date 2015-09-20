@@ -1,5 +1,5 @@
 {:sentence-repo-type :jdbc
  :sentence-repo-database {:subprotocol "mysql"
-                          :subname "//localhost:3306/lang"
+                          :subname "//localhost:3306/lang_dev"
                           :user "lang"
                           :password "lang"}}
