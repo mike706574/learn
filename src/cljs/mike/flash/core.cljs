@@ -5,7 +5,6 @@
             [reagent.core :as reagent]
             [cljs-http.client :as http]
             [cljs.core.async :refer [<!]]
-            [mike.frog :as frog]
             [lang.sentence.http :refer [HttpSentenceRepo]]))
 
 (enable-console-print!)

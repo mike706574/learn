@@ -4,8 +4,7 @@
             [lang.sentence.api :as api :refer [yaks]]
             [reagent.core :as reagent]
             [cljs-http.client :as http]
-            [cljs.core.async :refer [<!]]
-            [mike.frog :as frog]))
+            [cljs.core.async :refer [<!]]))
 
 (enable-console-print!)
 
