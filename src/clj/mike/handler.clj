@@ -44,13 +44,16 @@
      [:li (link-to "http://localhost:8080/prod/flash" "flash")]
      [:li (link-to "http://localhost:8080/prod/browse" "browse")]]]))
 
+(def head
+  [:head
+   [:meta {:charset "utf-8"}]
+   [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
+   [:title title]])
+
 (defn reagent-dev
   [title filename app]
   (html5
-   [:head
-    [:meta {:charset "utf-8"}]
-    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
-    [:title title]]
+   head
    [:body
     [:div#app]
     [:script {:type "text/javascript" :src (str "/js/" filename "/goog/base.js")}]
@@ -61,10 +64,7 @@
 (defn reagent-prod
   [title app]
   (html5
-   [:head
-    [:meta {:charset "utf-8"}]
-    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
-    [:title title]]
+   head
    [:body
     [:div#app]
     [:script {:type "text/javascript" :src (str "/js/" app ".js")}]]))
@@ -120,8 +120,3 @@
   (wrap-base-url
    (wrap-json-body
     (handler/site app-routes) {:keywords? true})))
-
-
-
-
-

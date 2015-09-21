@@ -82,7 +82,7 @@
            [:tbody
             (map (partial sentence-row languages) page-sentences)]]
           (joe/navigation-buttons page-number page-count (partial show-page state yak))])
-       (when loading [:span "Loading..."])]))
+       (when loading [:p "Loading..."])]))
 
 (defn app
   []

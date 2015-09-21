@@ -1,9 +1,11 @@
 (ns mike.common.core
   (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [lang.sentence.api :refer [yaks] :as api]
+  (:require [lang.sentence.api :as api]
             [cljs-http.client :as httpok]
             [pet.http :as http]
             [cljs.core.async :refer [<!]]))
+
+(enable-console-print!)
 
 (def base-path "http://localhost:8080/api/")
 (def sentence-path (str base-path "sentence"))
@@ -34,7 +36,7 @@
 
 (defn yak-select
   [on-change]
-  (on-change-select on-change (fmap :name yaks)))
+  (on-change-select on-change (fmap :name api/yaks)))
 
 (defn get-first-index
   [item coll]
@@ -65,18 +67,25 @@
      (when (not= page-number page-count)
        [:input {:type "button" :value "Last" :on-click #(show-fn page-count)}])]))
 
+(defn get-label
+  [selected languages]
+  (let [lang-map (mapm (fn [x] [(:key x) x]) languages)
+        language (selected lang-map)]
+    (:label language)))
+
 (defn flip-box
-  [title selected options flip next]
-  [:div
-   [:h2 title]
-   [:div [:span (selected options)]]
-   [:div
-    [:input {:type "button"
-             :value "Flip"
-             :on-click flip}]
-    [:input {:type "button"
-             :value "Next"
-             :on-click next}]]])
+  [yak selected sentence flip next]
+  (let [info (api/yaks yak)
+        title (:name info)
+        label (get-label selected (:languages info))]
+    (println "OK" title)
+    [:div
+     [:h2 title]
+     [:h5 label]
+     [:p (selected sentence)]
+     [:div
+      [:input {:type "button" :value "Flip" :on-click flip}]
+      [:input {:type "button" :value "Next" :on-click next}]]]))
 
 (defn flip-box2
   [title selected selected-name options flip next]
@@ -85,41 +94,5 @@
    [:span selected-name]
    [:div [:span (selected options)]]
    [:div
-    [:input {:type "button"
-             :value "Flip"
-             :on-click flip}]
-    [:input {:type "button"
-             :value "Next"
-             :on-click next}]]])
-
-(defn get-random-sentence
-  [yak]
-  (go (let [response (<! (http/get sentence-path {:query-params {:yak (name yak)}}))]
-        (:body (:body response)))))
-
-(defn get-tags
-  [yak]
-  (go (let [response (<! (http/get tags-path {:query-params {:yak (name yak)}}))]
-        (into #{} (:body (:body response))))))
-
-(defn get-sentences-for-tag
-  [yak tag]
-  (go (let [response (<! (http/get tag-path {:query-params {:yak (name yak) :tag tag}}))]
-        (into #{} (:body (:body response))))))
-
-(defn tag-sentence
-  [yak tag id]
-  (go (let [response (<! (http/post tag-path {:query-params {:yak (name yak) :tag tag :id id}}))]
-        (:body response))))
-
-(defn get-language
-  [yak]
-  (go
-    (let [response (<! (http/get (str base-path "language") {:query-params {:yak (name yak)}}))]
-      (:body response))))
-
-(defn get-sentence-range
-  [yak start end]
-  (go
-    (let [response (<! (http/get sentences-path {:query-params {:yak (name yak) :start start :end end}}))]
-      (:body response))))
+    [:input {:type "button" :value "Flip" :on-click flip}]
+    [:input {:type "button" :value "Next" :on-click next}]]])
