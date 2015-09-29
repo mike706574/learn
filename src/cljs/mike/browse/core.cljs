@@ -9,7 +9,7 @@
 
 (enable-console-print!)
 
-(def repo (HttpSentenceRepo. "http://localhost:8080/api/"))
+(def repo (HttpSentenceRepo. "http://mike.elasticbeanstalk.com/api/"))
 
 (defn load-page
   [yak number sentences sentence-count state]
@@ -98,3 +98,5 @@
   (reagent/render-component
    [app]
    (.getElementById js/document "app")))
+
+(start)

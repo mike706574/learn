@@ -9,7 +9,7 @@
 
 (enable-console-print!)
 
-(def repo (HttpSentenceRepo. "http://localhost:8080/api/"))
+(def repo (HttpSentenceRepo. "http://mike.elasticbeanstalk.com/api/"))
 
 (def state (reagent/atom {:loading false}))
 
@@ -65,3 +65,4 @@
      [app]
      (.getElementById js/document "app"))))
 
+(start)

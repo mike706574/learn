@@ -58,6 +58,13 @@
                                                :pretty-print false
                                                :output-wrapper false
                                                :closure-warnings {:non-standard-jsdoc :off}}}
+                       :add-dev {:source-paths ["src/cljs" "src/cljs/mike/add"]
+                                 :compiler {:optimizations :none
+                                            :output-to "resources/public/js/add.js"
+                                            :output-dir "resources/public/js/add"
+                                            :asset-path "js/out"
+                                            :pretty-print true
+                                            :source-map true}}
                        :exp-dev {:source-paths ["src/cljs" "src/cljs/mike/exp" ]
                                    :compiler {:optimizations :none
                                               :output-to "resources/public/js/exp.js"

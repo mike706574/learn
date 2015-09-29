@@ -16,7 +16,7 @@
 
 (defn parse-int [s] (Integer/parseInt s))
 
-(def config-file (io/file (io/resource "test_config.edn")))
+(def config-file (io/file (io/resource "config.edn")))
 (def config (edn/read-string (slurp config-file)))
 (def repo (JdbcSentenceRepo. (:sentence-repo-database config)))
 
@@ -35,16 +35,19 @@
     [:title "Home"]]
    [:body
     [:p "hi this is mike"]
-    [:span "dev"]
+    ;;  [:span "dev"]
+    ;; [:ul
+    ;;  [:li (link-to "http://localhost:8080/dev/flash" "flash")]
+    ;;  [:li (link-to "http://localhost:8080/dev/browse" "browse")]]
+    [:span "things"]
     [:ul
-     [:li (link-to "http://localhost:8080/dev/flash" "flash")]
-     [:li (link-to "http://localhost:8080/dev/browse" "browse")]]
-    [:span "prod"]
-    [:ul
-     [:li (link-to "http://localhost:8080/prod/flash" "flash")]
-     [:li (link-to "http://localhost:8080/prod/browse" "browse")]]]))
+     [:li (link-to "http://mike.elasticbeanstalk.com/prod/flash" "flash")]
+     [:li (link-to "http://mike.elasticbeanstalk.com/prod/browse" "browse")]]
 
-(def head
+    ]))
+
+(defn head
+  [title]
   [:head
    [:meta {:charset "utf-8"}]
    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
@@ -53,7 +56,7 @@
 (defn reagent-dev
   [title filename app]
   (html5
-   head
+   (head title)
    [:body
     [:div#app]
     [:script {:type "text/javascript" :src (str "/js/" filename "/goog/base.js")}]
@@ -64,7 +67,7 @@
 (defn reagent-prod
   [title app]
   (html5
-   head
+   (head title)
    [:body
     [:div#app]
     [:script {:type "text/javascript" :src (str "/js/" app ".js")}]]))
@@ -76,9 +79,10 @@
   (GET "/prod/flash" [] (reagent-prod "Flash" "flash"))
   (GET "/prod/browse" [] (reagent-prod "Browse" "browse"))
 
-  (GET "/dev/flash" [] (reagent-dev "Flash" "flash" "mike.flash"))
-  (GET "/dev/browse" [] (reagent-dev "Browse" "browse" "mike.browse"))
-  (GET "/dev/exp" [] (reagent-dev "Exp" "exp" "mike.exp"))
+  ;; (GET "/dev/flash" [] (reagent-dev "Flash" "flash" "mike.flash"))
+  ;; (GET "/dev/browse" [] (reagent-dev "Browse" "browse" "mike.browse"))
+  ;; (GET "/dev/exp" [] (reagent-dev "Exp" "exp" "mike.exp"))
+  ;; (GET "/dev/add" [] (reagent-dev "Add" "add" "mike.add"))
   
   (GET "/api/language" {{yak :yak} :params}
        (to-response (api/get-language repo yak)))
@@ -91,6 +95,12 @@
                  (api/get-sentence repo yak id))]
          (to-response c)))
   
+  (POST "/api/sentence" request
+        (let [body (:body request)
+              yak (:yak body)
+              sentence (dissoc body :yak)]
+          (to-response (api/add-sentence repo yak sentence)))) 
+
   (GET "/api/sentences" {{:keys [yak n start end tag]} :params}
        (to-response
         (if n
@@ -107,8 +117,9 @@
        (to-response (api/get-tagged-sentences repo (keyword yak) tag)))
   
   (POST "/api/tag" {{yak :yak tag :tag id :id} :params}
+        (to-response (api/tag-sentence repo (keyword yak) id tag))
         (to-response (api/tag-sentence repo (keyword yak) id tag)))
-  
+
   (GET "/api/tags" {{yak :yak} :params} (to-response (api/get-tags repo yak)))
    
   (route/not-found "Not Found"))
