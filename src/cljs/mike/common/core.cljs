@@ -38,6 +38,10 @@
   [on-change]
   (on-change-select on-change (fmap :name api/yaks)))
 
+(defn yak-select2
+  [on-change]
+  (on-change-select (fn [e] (on-change (keyword (get-value e)))) (fmap :name api/yaks)))
+
 (defn get-first-index
   [item coll]
   (first (keep-indexed #(when (= item %2) %1) coll)))
@@ -96,3 +100,9 @@
    [:div
     [:input {:type "button" :value "Flip" :on-click flip}]
     [:input {:type "button" :value "Next" :on-click next}]]])
+
+(defn text-box
+  [state k]
+  [:input {:type "text"
+           :value (k @state)
+           :on-change #(swap! state assoc k (get-value %))}])

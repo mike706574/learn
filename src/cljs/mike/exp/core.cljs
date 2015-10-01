@@ -85,8 +85,8 @@
     [:div 
      (when (not (nil? sentence))
        [:div 
-        (joe/yak-select #(do (choose-set (keyword (joe/get-value %)) state) 
-                             (fetch-sentence state)))
+        (joe/yak-select2 #(do (choose-set % state) 
+                              (fetch-sentence state)))
         (joe/flip-box2 title selected selected-title sentence #(swap! state swap-selection) #(fetch-sentence state))
         [:br]
         (button "Back" go-back)

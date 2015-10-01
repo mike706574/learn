@@ -9,7 +9,7 @@
 
 (enable-console-print!)
 
-(def repo (HttpSentenceRepo. "http://mike.elasticbeanstalk.com/api/"))
+(def repo (HttpSentenceRepo. "http://localhost:8080/api/"))
 
 (def state (reagent/atom {:loading false}))
 
@@ -39,8 +39,8 @@
   []
   (let [{:keys [yak title sentence selected loading] :as current-state} @state]
     [:div
-     (joe/yak-select #(do (choose-set (keyword (joe/get-value %)) state) 
-                          (fetch-sentence state)))
+     (joe/yak-select2 #(do (choose-set % state) 
+                           (fetch-sentence state)))
      (let [info (api/yaks yak)
            title (:name info)
            label (joe/get-label selected (:languages info))]
@@ -64,5 +64,3 @@
     (reagent/render-component
      [app]
      (.getElementById js/document "app"))))
-
-(start)

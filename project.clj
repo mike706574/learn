@@ -1,7 +1,7 @@
 (defproject mike "0.1.0-SNAPSHOT"
   :description "FIXME: write description"
   :url "http://example.com/FIXME"
-  :dependencies [[org.clojure/clojure "1.7.0-RC1"]
+  :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [org.clojure/tools.logging "0.3.1"]
                  [org.clojure/data.json "0.2.6"]
@@ -45,7 +45,7 @@
                                                 :output-wrapper false
                                                 :closure-warnings {:non-standard-jsdoc :off}}}
                        
-                       :flash-dev {:source-paths ["src/cljs" "src/cljs/mike/flash" ]
+                       :flash-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/flash" ]
                                    :compiler {:optimizations :none
                                               :output-to "resources/public/js/flash.js"
                                               :output-dir "resources/public/js/flash"
@@ -58,30 +58,27 @@
                                                :pretty-print false
                                                :output-wrapper false
                                                :closure-warnings {:non-standard-jsdoc :off}}}
-                       :add-dev {:source-paths ["src/cljs" "src/cljs/mike/add"]
+                       :add-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/add"]
                                  :compiler {:optimizations :none
                                             :output-to "resources/public/js/add.js"
                                             :output-dir "resources/public/js/add"
                                             :asset-path "js/out"
                                             :pretty-print true
                                             :source-map true}}
-                       :exp-dev {:source-paths ["src/cljs" "src/cljs/mike/exp" ]
-                                   :compiler {:optimizations :none
-                                              :output-to "resources/public/js/exp.js"
-                                              :output-dir "resources/public/js/exp"
-                                              :asset-path "js/out"
-                                              :pretty-print true
-                                              :source-map true}}
-                       :ferret-dev {:source-paths ["src/cljs" "src/cljs/mike/ferret" ]
-                                   :compiler {:optimizations :none
-                                              :output-to "resources/public/js/ferret.js"
-                                              :output-dir "resources/public/js/ferret"
-                                              :asset-path "js/out"
-                                              :pretty-print true
-                                              :source-map true}}
-
+                       :exp-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/exp" ]
+                                 :compiler {:optimizations :none
+                                            :output-to "resources/public/js/exp.js"
+                                            :output-dir "resources/public/js/exp"
+                                            :asset-path "js/out"
+                                            :pretty-print true
+                                            :source-map true}}
+                       :ferret-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/ferret" ]
+                                    :compiler {:optimizations :none
+                                               :output-to "resources/public/js/ferret.js"
+                                               :output-dir "resources/public/js/ferret"
+                                               :asset-path "js/out"
+                                               :pretty-print true
+                                               :source-map true}}
                        }
-
               }
-
-  )
+)

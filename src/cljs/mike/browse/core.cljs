@@ -9,7 +9,7 @@
 
 (enable-console-print!)
 
-(def repo (HttpSentenceRepo. "http://mike.elasticbeanstalk.com/api/"))
+(def repo (HttpSentenceRepo. "http://localhost:8080/api/"))
 
 (defn load-page
   [yak number sentences sentence-count state]
@@ -68,7 +68,7 @@
         languages (:languages info)
         page-count (get-page-count sentence-count page-size)]
       [:div
-       (joe/yak-select #(show-page-new-yak state (keyword (-> % .-target .-value)) 1))
+       (joe/yak-select2 #(show-page-new-yak state % 1))
        [:h2 (:name info)]
        (if (= 0 page-count)
          [:p "No sentences stored."]
@@ -98,5 +98,3 @@
   (reagent/render-component
    [app]
    (.getElementById js/document "app")))
-
-(start)

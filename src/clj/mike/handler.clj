@@ -16,7 +16,7 @@
 
 (defn parse-int [s] (Integer/parseInt s))
 
-(def config-file (io/file (io/resource "config.edn")))
+(def config-file (io/file (io/resource "test_config.edn")))
 (def config (edn/read-string (slurp config-file)))
 (def repo (JdbcSentenceRepo. (:sentence-repo-database config)))
 
@@ -35,10 +35,11 @@
     [:title "Home"]]
    [:body
     [:p "hi this is mike"]
-    ;;  [:span "dev"]
-    ;; [:ul
-    ;;  [:li (link-to "http://localhost:8080/dev/flash" "flash")]
-    ;;  [:li (link-to "http://localhost:8080/dev/browse" "browse")]]
+    [:span "dev"]
+    [:ul
+     [:li (link-to "http://localhost:8080/dev/flash" "flash")]
+     [:li (link-to "http://localhost:8080/dev/browse" "browse")]
+     [:li (link-to "http://localhost:8080/dev/add" "add")]]
     [:span "things"]
     [:ul
      [:li (link-to "http://mike.elasticbeanstalk.com/prod/flash" "flash")]
@@ -79,10 +80,10 @@
   (GET "/prod/flash" [] (reagent-prod "Flash" "flash"))
   (GET "/prod/browse" [] (reagent-prod "Browse" "browse"))
 
-  ;; (GET "/dev/flash" [] (reagent-dev "Flash" "flash" "mike.flash"))
-  ;; (GET "/dev/browse" [] (reagent-dev "Browse" "browse" "mike.browse"))
-  ;; (GET "/dev/exp" [] (reagent-dev "Exp" "exp" "mike.exp"))
-  ;; (GET "/dev/add" [] (reagent-dev "Add" "add" "mike.add"))
+  (GET "/dev/flash" [] (reagent-dev "Flash" "flash" "mike.flash"))
+  (GET "/dev/browse" [] (reagent-dev "Browse" "browse" "mike.browse"))
+  (GET "/dev/exp" [] (reagent-dev "Exp" "exp" "mike.exp"))
+  (GET "/dev/add" [] (reagent-dev "Add" "add" "mike.add"))
   
   (GET "/api/language" {{yak :yak} :params}
        (to-response (api/get-language repo yak)))
@@ -95,9 +96,8 @@
                  (api/get-sentence repo yak id))]
          (to-response c)))
   
-  (POST "/api/sentence" request
-        (let [body (:body request)
-              yak (:yak body)
+  (POST "/api/sentence" {params :params body :body}
+        (let [yak (:yak body)
               sentence (dissoc body :yak)]
           (to-response (api/add-sentence repo yak sentence)))) 
 
