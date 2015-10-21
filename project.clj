@@ -15,6 +15,7 @@
                  [ring/ring-defaults "0.1.5"]
                  [compojure "1.3.4"]
                  [hiccup "1.0.5"]
+                 [clj-http "1.1.2"]
                  ;; cljs
                  [cljs-http "0.1.34"]
                  [org.clojure/clojurescript "0.0-3308"]
@@ -45,7 +46,7 @@
                                                 :output-wrapper false
                                                 :closure-warnings {:non-standard-jsdoc :off}}}
                        
-                       :flash-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/flash" ]
+                       :flash-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/flash"]
                                    :compiler {:optimizations :none
                                               :output-to "resources/public/js/flash.js"
                                               :output-dir "resources/public/js/flash"
@@ -65,20 +66,45 @@
                                             :asset-path "js/out"
                                             :pretty-print true
                                             :source-map true}}
-                       :exp-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/exp" ]
+                       :exp-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/exp"]
                                  :compiler {:optimizations :none
                                             :output-to "resources/public/js/exp.js"
                                             :output-dir "resources/public/js/exp"
                                             :asset-path "js/out"
                                             :pretty-print true
                                             :source-map true}}
-                       :ferret-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/ferret" ]
+                       :ferret-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/ferret"]
                                     :compiler {:optimizations :none
                                                :output-to "resources/public/js/ferret.js"
                                                :output-dir "resources/public/js/ferret"
                                                :asset-path "js/out"
                                                :pretty-print true
                                                :source-map true}}
+                       :whale-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/whale"]
+                                   :compiler {:optimizations :none
+                                              :output-to "resources/public/js/whale.js"
+                                              :output-dir "resources/public/js/whale"
+                                              :asset-path "js/out"
+                                              :pretty-print true
+                                              :source-map true}}
+
+                       :types-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/types"]
+                                   :compiler {:optimizations :none
+                                              :output-to "resources/public/js/types.js"
+                                              :output-dir "resources/public/js/types"
+                                              :asset-path "js/out"
+                                              :pretty-print true
+                                              :source-map true}}
+
+                       :lesson-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/lesson"]
+                                    :compiler {:optimizations :none
+                                               :output-to "resources/public/js/lesson.js"
+                                               :output-dir "resources/public/js/lesson"
+                                               :asset-path "js/out"
+                                               :pretty-print true
+                                               :source-map true}}
+
+                       
                        }
               }
-)
+  )

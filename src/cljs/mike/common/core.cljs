@@ -16,6 +16,10 @@
 (defn maps [f coll] (into #{} (map f coll)))
 (defn mapm [f coll] (into {} (map f coll)))
 
+(defn ok? [status] (= (keyword status) :ok))
+
+(defn find-first [f coll] (first (filter f coll)))
+
 (defn mapback
   [f coll]
   (into (empty coll) (map f coll)))
@@ -28,6 +32,13 @@
   [e]
   (let [k (key e)]
     [:option {:key k :value k} (val e)]))
+
+(defn get-value [e] (-> e .-target .-value))
+
+(defn fun-select
+  [f options]
+  [:select {:on-change #(f (get-value %))}
+   (map build-option options)])
 
 (defn on-change-select
   [on-change options]
@@ -56,7 +67,12 @@
           (first v)
           (get v next-index))))))
 
-(defn get-value [e] (-> e .-target .-value))
+(defn button
+  [id label f]
+  [:input {:type "button"
+           :id id
+           :value label
+           :on-click f}])
 
 (defn navigation-buttons
   [page-number page-count show-fn]
@@ -104,5 +120,13 @@
 (defn text-box
   [state k]
   [:input {:type "text"
+           :id k
            :value (k @state)
            :on-change #(swap! state assoc k (get-value %))}])
+
+(defn text-box-in
+  [state id ks]
+  [:input {:type "text"
+           :id id
+           :value (get-in @state ks)
+           :on-change #(swap! state assoc-in ks (get-value %))}])
