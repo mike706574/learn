@@ -9,7 +9,7 @@
 
 (enable-console-print!)
 
-(def repo (HttpEntityRepo. "http://localhost:8080/whale/"))
+(def repo (HttpEntityRepo. "http://localhost:8080/api/"))
 
 (defn get-type [type-id types] (joe/find-first #(= type-id (:id %)) types))
 

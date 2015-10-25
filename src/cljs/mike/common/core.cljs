@@ -1,15 +1,14 @@
 (ns mike.common.core
   (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [lang.sentence.api :as api]
-            [cljs-http.client :as httpok]
+  (:require [cljs-http.client :as httpok]
+            [clojure.string :refer [capitalize]]
             [pet.http :as http]
             [cljs.core.async :refer [<!]]))
 
 (enable-console-print!)
 
 (def base-path "http://localhost:8080/api/")
-(def sentence-path (str base-path "sentence"))
-(def sentences-path (str base-path "sentences"))
+
 (def tag-path (str base-path "tag"))
 (def tags-path (str base-path "tags"))
 
@@ -36,22 +35,14 @@
 (defn get-value [e] (-> e .-target .-value))
 
 (defn fun-select
-  [f options]
-  [:select {:on-change #(f (get-value %))}
+  [f options selected]
+  [:select {:on-change #(f (get-value %)) :value selected}
    (map build-option options)])
 
 (defn on-change-select
   [on-change options]
   [:select {:on-change on-change}
    (map build-option options)])
-
-(defn yak-select
-  [on-change]
-  (on-change-select on-change (fmap :name api/yaks)))
-
-(defn yak-select2
-  [on-change]
-  (on-change-select (fn [e] (on-change (keyword (get-value e)))) (fmap :name api/yaks)))
 
 (defn get-first-index
   [item coll]
@@ -95,7 +86,7 @@
 
 (defn flip-box
   [yak selected sentence flip next]
-  (let [info (api/yaks yak)
+  (let [info nil
         title (:name info)
         label (get-label selected (:languages info))]
     (println "OK" title)
@@ -124,8 +115,26 @@
            :value (k @state)
            :on-change #(swap! state assoc k (get-value %))}])
 
+(defn label
+  [target]
+  [:label {:for target}
+   (str (capitalize (name target)) ": ")])
+
+(defn number-box
+  [state k min max]
+  (let []
+
+      )
+  [:input {:type "number"
+           :id k
+           :name k
+           :value (k @state)
+           :min min
+           :max max
+           :on-change #(swap! state assoc k (get-value %))}])
+
 (defn text-box-in
-  [state id ks]
+  [state id ks] 
   [:input {:type "text"
            :id id
            :value (get-in @state ks)

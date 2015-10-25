@@ -32,21 +32,21 @@
   :profiles {:uberjar {:aot :all}
              :production {:ring {:open-browser? false, :stacktraces? false, :auto-reload? false}}
              :dev {:dependencies [[ring-mock "0.1.5"] [ring/ring-devel "1.3.1"]]}}
-  :cljsbuild {:builds {:browse-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/browse"]
+  :cljsbuild {:builds {:browse-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/browse"]
                                     :compiler {:optimizations :none
                                                :output-to "resources/public/js/browse.js"
                                                :output-dir "resources/public/js/browse"
                                                :asset-path "js/out"
                                                :pretty-print true
                                                :source-map true}}
-                       :browse-prod {:source-paths ["src/cljs/mike/common" "src/cljs/mike/browse"]
+                       :browse-prod {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/browse"]
                                      :compiler {:output-to "resources/public/js/browse.js"
                                                 :optimizations :advanced
                                                 :pretty-print false
                                                 :output-wrapper false
                                                 :closure-warnings {:non-standard-jsdoc :off}}}
                        
-                       :flash-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/flash"]
+                       :flash-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/flash"]
                                    :compiler {:optimizations :none
                                               :output-to "resources/public/js/flash.js"
                                               :output-dir "resources/public/js/flash"
@@ -59,28 +59,28 @@
                                                :pretty-print false
                                                :output-wrapper false
                                                :closure-warnings {:non-standard-jsdoc :off}}}
-                       :add-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/add"]
+                       :add-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/add"]
                                  :compiler {:optimizations :none
                                             :output-to "resources/public/js/add.js"
                                             :output-dir "resources/public/js/add"
                                             :asset-path "js/out"
                                             :pretty-print true
                                             :source-map true}}
-                       :exp-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/exp"]
+                       :exp-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/exp"]
                                  :compiler {:optimizations :none
                                             :output-to "resources/public/js/exp.js"
                                             :output-dir "resources/public/js/exp"
                                             :asset-path "js/out"
                                             :pretty-print true
                                             :source-map true}}
-                       :ferret-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/ferret"]
+                       :ferret-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/ferret"]
                                     :compiler {:optimizations :none
                                                :output-to "resources/public/js/ferret.js"
                                                :output-dir "resources/public/js/ferret"
                                                :asset-path "js/out"
                                                :pretty-print true
                                                :source-map true}}
-                       :whale-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/whale"]
+                       :whale-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/whale"]
                                    :compiler {:optimizations :none
                                               :output-to "resources/public/js/whale.js"
                                               :output-dir "resources/public/js/whale"
@@ -88,7 +88,7 @@
                                               :pretty-print true
                                               :source-map true}}
 
-                       :types-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/types"]
+                       :types-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/types"]
                                    :compiler {:optimizations :none
                                               :output-to "resources/public/js/types.js"
                                               :output-dir "resources/public/js/types"
@@ -96,15 +96,13 @@
                                               :pretty-print true
                                               :source-map true}}
 
-                       :lesson-dev {:source-paths ["src/cljs/mike/common" "src/cljs/mike/lesson"]
+                       :lesson-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/lesson"]
                                     :compiler {:optimizations :none
                                                :output-to "resources/public/js/lesson.js"
                                                :output-dir "resources/public/js/lesson"
                                                :asset-path "js/out"
                                                :pretty-print true
-                                               :source-map true}}
-
-                       
+                                               :source-map true}} 
                        }
               }
   )

@@ -1,6 +1,7 @@
 (ns mike.types.core
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [mike.common.core :as joe]
+            [mike.common.state :refer [loading! commit! done! error!]]
             [reagent.core :as reagent]
             [lang.entity.api :as api]
             [cljs.core.async :refer [<!]]
@@ -8,15 +9,15 @@
 
 (enable-console-print!)
 
-(def repo (HttpEntityRepo. "http://localhost:8080/whale/"))
+(def repo (HttpEntityRepo. "http://localhost:8080/api/" "mike"))
 
 (defn load-types
   [state]
   (go
     (let [{:keys [status body]} (<! (api/get-types repo))]
       (if (joe/ok? status)
-        (swap! state assoc :types body :loading false)
-        (swap! state assoc :error true :loading false)))))
+        (done! state :types body)
+        (error! state "ERROR!")))))
 
 (defn render-types
   [state]
@@ -40,16 +41,15 @@
                [:li {:key description} "Description: " description]
                [:li {:key schema} "Schema: " schema]]])]]])]]))
 
-
 (defn render
   [state]
-  (let [{:keys [error loading]} @state]
-    (println "HEY" error)
-    (if error
-      [:h2 "ERROR"]
-      (if loading
-        [:h2 "LOADING"]
-        (render-types state)))))
+  (let [{:keys [error loading message]} @state]
+    [:div
+     (when error [:h3 "Error!"])
+     (when message [:span message])
+     (if loading
+       [:span "Loading.."]
+       (render-types state))]))
 
 (defn app
   []

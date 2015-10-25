@@ -1,26 +1,55 @@
 (ns mike.handler
-  (:require [compojure.core :refer [routing defroutes routes GET POST DELETE]]
+  (:require [compojure.core :refer [routing defroutes routes GET POST DELETE PUT]]
             [ring.middleware.json :refer [wrap-json-body]]
             [hiccup.middleware :refer [wrap-base-url]]
-            [hiccup.page :refer [html5]]
+            [hiccup.page :refer [html5 include-css]]
             [hiccup.element :refer [link-to]]
             [compojure.handler :as handler]
             [compojure.route :as route]
-            [lang.sentence.api :as api]
-            [lang.sentence.jdbc :as jdbc]
-            [lang.entity.api :as ocean]
+            [lang.entity.api :as api]
             [lang.entity.jdbc :as what]
+            [lang.entity.http :as lol]
             [pet.http :as pete]
             [clj-http.client :as http] 
             [clojure.walk :refer [prewalk]] 
             [clojure.data.json :as json]
             [clojure.java.io :as io]
             [clojure.edn :as edn]
-            [clojure.core.async :refer [<!!]])
-  (:import [lang.entity.jdbc JdbcEntityRepo]
-           [lang.sentence.jdbc JdbcSentenceRepo]
-           [java.text SimpleDateFormat]
+            [clojure.string :refer [blank?]]
+            [clojure.core.async :refer [<!!]]
+            [mike.component :as component])
+  (:import [java.text SimpleDateFormat]
+           [lang.entity.jdbc JdbcEntityRepo]
+           [lang.entity.http HttpEntityRepo]
            [java.sql Timestamp]))
+
+(def en-it-type
+  {:id :en-it
+   :label "English/Italian"
+   :description "Bilingual sentence pairs: English and Italian"
+   :attributes [{:id "english"
+                 :label "English"
+                 :schema :str
+                 :description "The sentence in English"}
+                {:id "italian"
+                 :label "Italian"
+                 :schema :str
+                 :description "The sentence in Italian"}]})
+
+(def en-sp-type
+  {:id :en-sp
+   :label "English/Spanish"
+   :description "Bilingual sentence pairs: English and Spanish"
+   :attributes [{:id "english"
+                 :label "English"
+                 :schema :str
+                 :description "The sentence in English"}
+                {:id "spanish"
+                 :label "Spanish"
+                 :schema :str
+                 :description "The sentence in Spanish"}]})
+
+;;(def jello (HttpEntityRepo. "http://localhost:8080/repo/"))
 
 (defn date-to-string
   [date]
@@ -34,29 +63,17 @@
 
 (def config-file (io/file (io/resource "test_config.edn")))
 (def config (edn/read-string (slurp config-file)))
-(def repo (JdbcSentenceRepo. (:sentence-repo-database config)))
 
-(def entity-config (:entity-database config))
-
-;;(what/create! entity-config)
-
-(def whale (JdbcEntityRepo. (:entity-database config)))
+(def db (:entity-database config))
 
 (defn to-response
   [response]
   (let [result (<!! response)]
-    (if (= :ok (:status result))
-      {:status 200
-       :headers {"Content-Type" "application/json"}
-       :body (json/write-str (prewalk convert-if-date result))}
-      (do (println result)
-          {:status 409}))
-    
-
-    
-
-    )
-  )
+    (println "Result: " result)
+    {:status 200
+     :headers {"Content-Type" "application/json"}
+     :body (json/write-str (prewalk convert-if-date result))}
+))
 
 (defn home
   []
@@ -64,32 +81,18 @@
    [:head
     [:meta {:charset "utf-8"}]
     [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
+    (include-css "css/mike.css")
     [:title "Home"]]
    [:body
     [:p "hi this is mike"]
-    [:ul
-     [:li (link-to "http://localhost:8080/types" "types")]
-     [:li (link-to "http://localhost:8080/add" "add")]
-     [:li (link-to "http://localhost:8080/browse" "browse")]
-     [:li (link-to "http://localhost:8080/lesson" "lesson")]] 
-    [:span "dev"]
-    [:ul
-     [:li (link-to "http://localhost:8080/dev/flash" "flash")]
-     [:li (link-to "http://localhost:8080/dev/browse" "browse")]
-     [:li (link-to "http://localhost:8080/dev/whale" "whale")]
-     [:li (link-to "http://localhost:8080/dev/add" "add")]]
-    [:span "things"]
-    [:ul
-     [:li (link-to "http://mike.elasticbeanstalk.com/prod/flash" "flash")]
-     [:li (link-to "http://mike.elasticbeanstalk.com/prod/browse" "browse")]]
-
-    ]))
+    component/nav]))
 
 (defn head
   [title]
   [:head
    [:meta {:charset "utf-8"}]
    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
+   (include-css "css/mike.css")
    [:title title]])
 
 (defn reagent-dev
@@ -111,163 +114,134 @@
     [:div#app]
     [:script {:type "text/javascript" :src (str "/js/" app ".js")}]]))
 
-(defn type-page
-  []
-  (html5
-   (head "Types")
-   [:body
-    [:div
-      [:h3 "Types"]
-     [:ul
-     (for [{:keys [label id description attributes]} (:body (<!! (ocean/get-types whale)))]
-       [:li
-        [:h4 label]
-        [:ul
-         [:li "ID: " id]
-         [:li "Description: " description]
-         [:li "Attributes"]
-         (for [{:keys [id label schema description]} attributes]
-           [:div
-            [:h5 label]
-            [:ul 
-             [:li "ID: " id]
-             [:li "Description: " description]
-             [:li "Schema: " schema]]])]])]]]
+(defn repo [db user] (JdbcEntityRepo. db user))
 
-   ))
 
-(defroutes app-routes
-  (route/resources "/")
-  
-  (GET "/" [] (home))
-
-  (GET "/prod/flash" [] (reagent-prod "Flash" "flash"))
-  (GET "/prod/browse" [] (reagent-prod "Browse" "browse"))
-
-  (GET "/dev/flash" [] (reagent-dev "Flash" "flash" "mike.flash"))
-  (GET "/dev/browse" [] (reagent-dev "Browse" "browse" "mike.browse"))
-  (GET "/dev/exp" [] (reagent-dev "Exp" "exp" "mike.exp"))
-  (GET "/dev/add" [] (reagent-dev "Add" "add" "mike.add"))
-  (GET "/dev/whale" [] (reagent-dev "Whale" "whale" "mike.whale"))
-
+(defroutes views
+  (GET "/" [] (home)) 
   (GET "/types" [] (reagent-dev "Types" "types" "mike.types"))
   (GET "/add" [] (reagent-dev "Add" "add" "mike.add"))
   (GET "/browse" [] (reagent-dev "Browse" "browse" "mike.browse"))
   (GET "/lesson" [] (reagent-dev "Lesson" "lesson" "mike.lesson"))
+  )
+
+;; TODO: validate things
+(defroutes api
+  (POST "/api/type"
+        {body :body user :user}
+        (to-response (api/create-type! (repo db user) body)))
+
+  (DELETE "/api/type/:type-id"
+          {{type-id :type-id} :params user :user}
+          (to-response (api/delete-type! (repo db user) type-id)))
+
+  (GET "/api/type"
+       {{type-id :type-id} :params user :user}
+       (to-response (api/get-type (repo db user) type-id)))
+
+  (GET "/api/types"
+       {user :user}
+       (to-response (api/get-types (repo db user))))
+
+  (GET "/api/type/:type-id/entity-count"
+       {{type-id :type-id} :params user :user}
+       (to-response (api/count-entities (repo db user) type-id)))
+
+  (GET "/api/type/:type-id/entity/:entity-id"
+       {{:keys [type-id entity-id]} :params user :user}
+       (to-response
+        (api/get-entity-by-id (repo db user) type-id (parse-int entity-id)))) 
+
+  (GET "/api/type/:type-id/entity" 
+       {{:keys [type-id entity-id tag]} :params user :user}
+       (to-response
+        (if (nil? tag)
+          (api/get-random-entity (repo db user) type-id)
+          (api/get-random-entity-with-tag (repo db user) type-id tag))))
+
+  (DELETE "/api/type/:type-id/entity/:entity-id"
+          {{:keys [type-id entity-id]} :params user :user}
+          (to-response (api/delete-entity! (repo db user) type-id (parse-int entity-id))))
+
+  (POST "/api/type/:type-id/entity"
+        {{type-id :type-id} :params body :body user :user}
+        (let [x (api/add-entity! (repo db user) type-id body)]
+          (to-response x)))
+
   
-  (POST "/whale/type" {body :body}
-        (to-response (ocean/create-type! whale body)))
-
-  (DELETE "/whale/type" {{type-id :type-id} :params}
-          (to-response (ocean/delete-type! whale type-id)))
-
-  (GET "/whale/type" {{type-id :type-id} :params}
-       (to-response (ocean/get-type whale type-id)))
-
-  (GET "/whale/types" []
-       (to-response (ocean/get-types whale)))
-
-  (GET "/whale/entity-count" {{type-id :type-id} :params}
-        (to-response (ocean/count-entities whale type-id)))
-
-;; TODO HERE
-  (POST "/whale/entity" {body :body}
-        (let [type-id (:type-id body)]
-          (println "TYPE ID =" type-id)
-          (to-response (ocean/add-entity! whale type-id body))))
-  
-  (GET "/whale/entities" {{:keys [type-id n start end tag]} :params}
-       ;; TODO: Handle no type-id
+  (GET "/api/type/:type-id/entities"
+       {{:keys [type-id n start end tag]} :params user :user}
        (let [type-id (keyword type-id)] 
          (to-response
           (if n
             (if tag
-              (ocean/get-random-entities-with-tag whale type-id tag (parse-int n))
-              (ocean/get-random-entities whale type-id (parse-int n))) 
+              (api/get-random-entities-with-tag (repo db user) type-id tag (parse-int n))
+              (api/get-random-entities (repo db user) type-id (parse-int n))) 
             (if (and start end)
-              (ocean/get-entity-range whale type-id (parse-int start) (parse-int end))
+              (api/get-entity-range (repo db user) type-id (parse-int start) (parse-int end))
               (if tag
                 (println "TODO: get entity range for tag")
                 {:status :bad-request :message "BAD COMBINATION"}))))))
-  
-  (POST "/whale/lesson" {{:keys [type-id user name description]} :body}
-        (to-response (ocean/create-lesson! whale type-id user name description)))
 
-  (GET "/whale/lessons" {{:keys [type-id user]} :params}
-        (to-response (ocean/get-lessons-for-user whale type-id user)))
-
-  
-
-
-
-
-
-  
-
-  
-  (GET "/api/language" {{yak :yak} :params}
-       (to-response (api/get-language repo yak)))
-  
-  (GET "/api/sentence" {{yak :yak id :id tag :tag} :params}
-       (let [c (if (nil? id)
-                 (if tag
-                   (api/get-tagged-random-sentence repo yak tag)
-                   (api/get-random-sentence repo yak))
-                 (api/get-sentence repo yak id))]
-         (to-response c)))
-  
-  (POST "/api/sentence" {params :params body :body}
-        (let [yak (:yak body)
-              sentence (dissoc body :yak)]
-          (to-response (api/add-sentence repo yak sentence)))) 
-
-  (GET "/api/sentences" {{:keys [yak n start end tag]} :params}
+  ;; LESSONS
+  (GET "/api/type/:type-id/lesson/:lesson-id"
+       {{:keys [type-id lesson-id]} :params user :user}
        (to-response
-        (if n
-          (if tag
-            (api/get-tagged-random-sentences repo (keyword yak) tag (parse-int n))
-            (api/get-random-sentences repo (keyword yak) (parse-int n))) 
-          (if (and start end)
-            (api/get-sentence-range repo (keyword yak) (parse-int start) (parse-int end))
-            (if tag
-              (api/get-tagged-sentences repo yak tag)
-              {:status :bad-request :message "BAD COMBINATION"})))))
-  
-  (GET "/api/tag" {{yak :yak tag :tag} :params}
-       (to-response (api/get-tagged-sentences repo (keyword yak) tag)))
-  
-  (POST "/api/tag" {{yak :yak tag :tag id :id} :params}
-        (to-response (api/tag-sentence repo (keyword yak) id tag))
-        (to-response (api/tag-sentence repo (keyword yak) id tag)))
+        (api/get-lesson (repo db user) type-id (parse-int lesson-id))))
 
-  (GET "/api/tags" {{yak :yak} :params} (to-response (api/get-tags repo yak)))
-  
-  (route/not-found "Not Found"))
+  (GET "/api/type/:type-id/lessons"
+       {{:keys [type-id]} :params user :user}
+       (to-response (api/get-lessons (repo db user) type-id)))
+
+  (POST "/api/type/:type-id/lesson"
+        {{:keys [name description length] :as body} :body {type-id :type-id} :params  user :user}
+        (to-response (api/create-lesson! (repo db user) type-id name description (parse-int length))))
+
+  (DELETE "/api/type/:type-id/lesson/:lesson-id"
+       {{:keys [type-id lesson-id]} :params user :user}
+       (to-response
+        (api/delete-lesson! (repo db user) type-id (parse-int lesson-id))))
+
+  (PUT "/api/type/:type-id/lesson/:lesson-id/entity/:entity-id"
+       {{:keys [type-id lesson-id entity-id]} :params user :user}
+       (to-response (api/add-to-lesson! (repo db user) type-id (parse-int lesson-id) (parse-int entity-id))))
+
+  (DELETE "/api/type/:type-id/lesson/:lesson-id/entity/:entity-id"
+          {{:keys [type-id lesson-id entity-id]} :params user :user}
+          (to-response (api/remove-from-lesson! (repo db user) type-id (parse-int lesson-id) (parse-int entity-id))))
+
+  ;; SESSIONS
+  (POST "/api/type/:type-id/session"
+        {{:keys [type-id]} :params {lesson-id :lesson-id} :body user :user}
+        (to-response (api/start-lesson! (repo db user) type-id (parse-int lesson-id))))
+
+  (PUT "/api/type/:type-id/session/:session-id"
+       {{:keys [type-id session-id]} :params {entity-id :entity-id correct :correct} :body user :user}
+       (to-response (api/record-answer! (repo db user) type-id (parse-int session-id) (parse-int entity-id) correct)))
+
+  (GET "/api/type/:type-id/session/:session-id"
+       {{:keys [type-id session-id]} :params user :user}
+       (to-response (api/get-session (repo db user) type-id (parse-int session-id)))))
 
 (defn init [] (println "mike is starting"))
 (defn destroy [] (println "mike is shutting down"))
 
+(defn wrap-user
+  [handler]
+  (fn [request]
+    (let [headers (:headers request)
+          user (get headers "lang-user")]
+      (if (nil? user)
+        {:status 401 :body "You suck!"}
+        (handler (assoc request :user user))))))
+
 (def app
   (wrap-base-url
    (wrap-json-body
-    (handler/site app-routes) {:keywords? true})))
-
-;;(println (http/delete "http://localhost:8080/whale/type?type-id=thing"))
-
-;;(println (http/get "http://localhost:8080/whale/type?type-id=thing"))
-
-
-
-
-;; (println
-;;   (http/post
-;;    "http://localhost:8080/whale/type"
-;;    {:content-type :json
-;;     :body
-;;     (json/write-str{:id "thing"
-;;                     :label "Thing"
-;;                     :description "A thing"
-;;                     :attributes [{:id "color"
-;;                                   :label "Color"
-;;                                   :schema :str
-;;                                   :description "The color of the thing"}]})})) 
+    (handler/site
+     (routes
+      (route/resources "/")
+      views
+      (wrap-user api)
+      (route/not-found "Not Found")))
+    {:keywords? true})))
