@@ -105,10 +105,6 @@
         (done! state :lessons body :mode :lesson :entity-id entity-id)
         (error! state message)))))
 
-(defn validate-property
-  [{:keys [value type required validate] :as property}] 
-  (assoc property :valid? (validate value)))
-
 (defn render-browse
   [state]
   (let [{:keys [type-id types page-number entities new-entity page-size entity-count] :as current-state} @state
