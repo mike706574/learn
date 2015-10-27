@@ -40,12 +40,6 @@
      (when (not= page-number page-count)
        [:input {:type "button" :value "Last" :on-click #(show-fn page-count)}])]))
 
-(defn get-label
-  [selected languages]
-  (let [lang-map (mapm (fn [x] [(:key x) x]) languages)
-        language (selected lang-map)]
-    (:label language)))
-
 (defn flip-box
   [yak selected sentence flip next]
   (let [info nil
