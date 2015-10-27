@@ -2,7 +2,8 @@
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [mike.common.core :as joe]
             [mike.common.state :refer [loading! commit! done! error!!]]
-            [mike.component :as component]
+            [mike.common.component :as com]
+            [mike.component :as xcom]
             [lang.entity.api :as api]
             [reagent.core :as reagent]
             [clojure.string :refer [blank? capitalize]]
@@ -102,9 +103,9 @@
      (let [{:keys [type-id types lessons new-lesson] :as current-state} @state
            [validated-lesson all-valid?] (joe/validate-form new-lesson)]
     [:div
-     (joe/fun-select #(load-lessons! state %) (joe/mapm (fn [{:keys [id label]}] [id label]) types) type-id)
+     (com/fun-select #(load-lessons! state %) (joe/mapm (fn [{:keys [id label]}] [id label]) types) type-id)
      [:h3 "Create a Lesson"]
-     (joe/render-form state :new-lesson validated-lesson)
+     (com/form state :new-lesson validated-lesson)
      [:input {:type "button"
               :id :create
               :disabled (not all-valid?) 
@@ -113,12 +114,12 @@
      [:h3 "Lessons"]
      (if (empty? lessons)
        [:span "No lessons stored."]
-       (joe/render-table lessons [[:property :id]
-                                  [:property :user]
-                                  [:property :description]
-                                  [:property :length]
-                                  [:action :delete "Delete" delete-lesson! [state :id]]
-                                  [:action :view "View" view-lesson! [state :id]]]))]))
+       (com/table lessons [[:property :id]
+                           [:property :user]
+                           [:property :description]
+                           [:property :length]
+                           [:action :delete "Delete" delete-lesson! [state :id]]
+                           [:action :view "View" view-lesson! [state :id]]]))]))
                                 
 (defn render-lesson
   [state]
@@ -127,7 +128,7 @@
         columns (concat [[:property :id]]
                         (mapv (fn [attr] [:property (keyword (:id attr))]) attributes)
                         [[:action :delete "Remove" remove-from-lesson! [state :id]]])]
-    (joe/render-table entities columns)))
+    (com/table entities columns)))
 
 (defn app
   []
@@ -139,8 +140,8 @@
     (load-types! state)
     (fn []
       (println "Rendering...")
-      (joe/render-app state component/nav {:browse render-lessons
-                                           :view render-lesson}))))
+      (com/app state xcom/nav {:browse render-lessons
+                               :view render-lesson}))))
     
 (defn start
   []
