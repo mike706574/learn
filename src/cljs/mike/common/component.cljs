@@ -1,5 +1,6 @@
 (ns mike.common.component
-  (:require [mike.common.state :refer [swap-in!]]
+  (:require [reagent.core :as reagent]
+            [mike.common.state :refer [swap-in!]]
             [clojure.string :refer [blank? capitalize]]))
 
 ;; TODO: where do i belong?
@@ -40,28 +41,28 @@
      (when (not= page-number page-count)
        [:input {:type "button" :value "Last" :on-click #(show-fn page-count)}])]))
 
-(defn flip-box
-  [yak selected sentence flip next]
-  (let [info nil
-        title (:name info)
-        label (get-label selected (:languages info))]
-    [:div
-     [:h2 title]
-     [:h5 label]
-     [:p (selected sentence)]
-     [:div
-      [:input {:type "button" :value "Flip" :on-click flip}]
-      [:input {:type "button" :value "Next" :on-click next}]]]))
+;; (defn flip-box
+;;   [yak selected sentence flip next]
+;;   (let [info nil
+;;         title (:name info)
+;;         label (get-label selected (:languages info))]
+;;     [:div
+;;      [:h2 title]
+;;      [:h5 label]
+;;      [:p (selected sentence)]
+;;      [:div
+;;       [:input {:type "button" :value "Flip" :on-click flip}]
+;;       [:input {:type "button" :value "Next" :on-click next}]]]))
 
-(defn flip-box2
-  [title selected selected-name options flip next]
-  [:div
-   [:h2 title]
-   [:span selected-name]
-   [:div [:span (selected options)]]
-   [:div
-    [:input {:type "button" :value "Flip" :on-click flip}]
-    [:input {:type "button" :value "Next" :on-click next}]]])
+;; (defn flip-box2
+;;   [title selected selected-name options flip next]
+;;   [:div
+;;    [:h2 title]
+;;    [:span selected-name]
+;;    [:div [:span (selected options)]]
+;;    [:div
+;;     [:input {:type "button" :value "Flip" :on-click flip}]
+;;     [:input {:type "button" :value "Next" :on-click next}]]])
 
 (defn text-box
   [state k]
@@ -82,7 +83,7 @@
            :value (get-in @state ks)
            :on-change #(swap! state assoc-in ks (get-value %))}])
 
-(defn render-table
+(defn table
   [rows columns]
   [:table
    [:thead
@@ -133,11 +134,11 @@
      (if loading
        [:span "Loading..."]
        (let [f (modes mode)]
-        (f state)))))
+        (f state)))]))
       
 (defn boot 
   [component id]
   (fn []
     (reagent/render-component 
       [component] 
-      (.getElementById js/document id)))    
+      (.getElementById js/document id))))

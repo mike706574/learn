@@ -133,8 +133,8 @@
         [:p (str "Total: " entity-count)]
         [:p (str "Page " page-number " of " page-count)]
         (let [columns  (concat [[:property :id]]
-                               (mapv #(vec :property (keyword (:id %))) attributes)
-                               [[:action :delete "Delete" delete-dentity! [state :id]]
+                               (mapv #(vector :property (keyword (:id %))) attributes)
+                               [[:action :delete "Delete" delete-entity! [state :id]]
                                 [:action :add-to-lesson "Add to Lesson" load-lessons! [state :id]]])]
           (com/table entities columns))])]))
         
