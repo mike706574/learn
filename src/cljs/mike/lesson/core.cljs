@@ -143,8 +143,4 @@
       (com/app state xcom/nav {:browse render-lessons
                                :view render-lesson}))))
     
-(defn start
-  []
-  (reagent/render-component
-   [app]
-   (.getElementById js/document "app")))
+(def start (partial com/start app))
