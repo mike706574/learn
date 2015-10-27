@@ -128,30 +128,12 @@
        [:div
         [:p (str "Total: " entity-count)]
         [:p (str "Page " page-number " of " page-count)]
-        [:table
-         [:thead
-          [:tr
-           (let [left [[:th {:key :id} "ID"]
-                       [:th {:key :user} "User"]]
-                 mid (into [] (for [{:keys [id label]} attributes]
-                                [:th {:key id} label])) 
-                 right [[:th {:key :delete} "Delete"]]]
-             (concat left mid right))]]
-         [:tbody
-          (for [{:keys [id user] :as entity} entities]
-            [:tr {:key id}
-             (let [left [[:td {:key :id} id]
-                         [:td {:key :user} user]]
-                   mid (into [] (for [attribute attributes]
-                                  [:td {:key (:id attribute)}
-                                   (get entity (keyword (:id attribute)))]))
-                   right [[:td {:key :delete} (joe/button :delete "Delete" #(delete-entity! state id))]
-                          [:td {:key :add-to-lesson} (joe/button :delete "Add to Lesson" #(load-lessons! state id))]
-
-                          ]]
-               (concat left mid right))])]]
-        (joe/navigation-buttons page-number page-count (partial load-page! state type-id))])]))
-
+        (let [columns  (concat [[:property :id]]
+                               (mapv #(vec :property (keyword (:id %))) attributes)
+                               [[:action :delete "Delete" delete-dentity! [state :id]]
+                                [:action :add-to-lesson "Add to Lesson" load-lessons! [state :id]]])]
+          (joe/render-table entities columns))])]))
+        
 (defn add-to-lesson!
   [state entity-id lesson-id]
   (loading! state)
