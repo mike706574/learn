@@ -135,4 +135,9 @@
        (let [f (modes mode)]
         (f state)))))
       
-(defn start[f] (reagent/render-component [f] (.getElementById js/document "app")))
+(defn boot 
+  [component id]
+  (fn []
+    (reagent/render-component 
+      [component] 
+      (.getElementById js/document id)))    
