@@ -2,7 +2,8 @@
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [mike.common.core :as joe]
             [mike.common.state :refer [loading! commit! done! error! swap-in!]]
-            [mike.component :as component]
+            [mike.common.component :as com]
+            [mike.component :as xcom]
             [lang.entity.api :as api]
             [clojure.string :refer [blank? capitalize]]
             [reagent.core :as reagent]
@@ -113,9 +114,9 @@
         type-options (joe/mapm (fn [{:keys [id label]}] [id label]) types)
         [validated-entity all-valid?] (joe/validate-form new-entity)]
     [:div
-     (joe/fun-select #(load-page! state % 1) type-options type-id)
+     (com/fun-select #(load-page! state % 1) type-options type-id)
      [:h3 "Add: " label]
-     (joe/render-form state :new-entity validated-entity)
+     (com/form state :new-entity validated-entity)
      [:input {:type "button"
               :id :create
               :disabled (not all-valid?) 
@@ -132,7 +133,7 @@
                                (mapv #(vec :property (keyword (:id %))) attributes)
                                [[:action :delete "Delete" delete-dentity! [state :id]]
                                 [:action :add-to-lesson "Add to Lesson" load-lessons! [state :id]]])]
-          (joe/render-table entities columns))])]))
+          (com/table entities columns))])]))
         
 (defn add-to-lesson!
   [state entity-id lesson-id]
@@ -149,25 +150,11 @@
   (let [{:keys [entity-id lessons]} @state]
     (if (empty? lessons)
       [:span "No lessons stored."]
-      (joe/render-table
-       lessons [[:property :id]
-                [:property :user]
-                [:property :description]
-                [:property :length]
-                [:action :add-to-lesson "Add to Lesson" add-to-lesson! [state entity-id :id]]]))))
-
-(defn render
-  [state]
-  (let [{:keys [error loading message mode]} @state]
-    [:div
-     component/nav
-     (when error [:h3 "Error!"])
-     (when message [:span message])
-     (if loading
-       [:span "Loading.."]
-       (case mode
-         :browse (render-browse state)
-         :lesson (render-lessons state)))]))
+      (com/table lessons [[:property :id]
+                          [:property :user]
+                          [:property :description]
+                          [:property :length]
+                          [:action :add-to-lesson "Add to Lesson" add-to-lesson! [state entity-id :id]]]))))
 
 (defn app
   []
@@ -178,7 +165,8 @@
     (load-types! state)
     (fn []
       (println "Rendering...")
-      (render state))))
+      (com/app state xcom/nav {:browse render-browse
+                               :lesson render-lessons}))))
 
 (defn start
   []
