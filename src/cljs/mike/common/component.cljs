@@ -107,17 +107,6 @@
                             args (map #(if (keyword? %) (% row) %) template)]
                         (button k label #(apply f args))))]))])]])
 
-
-(defn validate-property
-  [{:keys [value type required validate] :as property}] 
-  (assoc property :valid? (validate value)))
-
-(defn validate-form
-  [properties]
-  (let [validated-properties (fmap validate-property properties)
-        all-valid? (every? #(:valid? (val %)) validated-properties)]
-    [validated-properties all-valid?]))
-
 (defn form
   [state form-key validated-properties]
   [:form
