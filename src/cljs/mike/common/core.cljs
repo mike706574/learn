@@ -193,7 +193,7 @@
                   :on-change #(swap-in! state [form-key k] assoc :dirty? true
                                                                  :value (get-value %))}]])))])
                                                                
-(defn render
+(defn render-app
   [state header modes]
   (let [{:keys [error loading message mode]} @state]
     [:div
