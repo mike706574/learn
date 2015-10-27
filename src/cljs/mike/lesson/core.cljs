@@ -24,6 +24,7 @@
                                :type :number
                                :validate joe/is-number?}})
 
+;; actions
 (defn load-lessons!
   [state type-id]
   (go
@@ -86,7 +87,17 @@
             (error! state message)))
         (error! state message)))))
 
-(defn render-things
+(defn remove-from-lesson!
+  [state entity-id]
+  (loading! state)
+  (go (let [{:keys [type-id lesson-id]} @state
+            {:keys [status body message]} (<! (api/remove-from-lesson! repo type-id lesson-id entity-id))]
+        (if (joe/ok? status)
+          (view-lesson! state lesson-id)
+          (error! state message)))))
+
+;; views
+(defn render-lessons
   [state]
      (let [{:keys [type-id types lessons new-lesson] :as current-state} @state
            [validated-lesson all-valid?] (joe/validate-form new-lesson)]
@@ -108,16 +119,7 @@
                                   [:property :length]
                                   [:action :delete "Delete" delete-lesson! [state :id]]
                                   [:action :view "View" view-lesson! [state :id]]]))]))
-
-(defn remove-from-lesson!
-  [state entity-id]
-  (loading! state)
-  (go (let [{:keys [type-id lesson-id]} @state
-            {:keys [status body message]} (<! (api/remove-from-lesson! repo type-id lesson-id entity-id))]
-        (if (joe/ok? status)
-          (view-lesson! state lesson-id)
-          (error! state message)))))
-
+                                
 (defn render-lesson
   [state]
   (let [{:keys [type-id lesson entities lesson-id type] :as current-state} @state
@@ -126,19 +128,6 @@
                         (mapv (fn [attr] [:property (keyword (:id attr))]) attributes)
                         [[:action :delete "Remove" remove-from-lesson! [state :id]]])]
     (joe/render-table entities columns)))
-
-(defn render
-  [state]
-  (let [{:keys [error loading message mode]} @state]
-    [:div
-     component/nav
-     (when error [:h3 "Error!"])
-     (when message [:span message])
-     (if loading
-       [:span "LOADING"]
-       (case mode
-         :browse (render-things state)
-         :view (render-lesson state)))]))
 
 (defn app
   []
@@ -150,8 +139,9 @@
     (load-types! state)
     (fn []
       (println "Rendering...")
-      (render state))))
-
+      (render state component/nav {:browse render-lessons
+                                   :view render-lesson}))))
+    
 (defn start
   []
   (reagent/render-component
