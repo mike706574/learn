@@ -167,9 +167,5 @@
       (println "Rendering...")
       (com/app state xcom/nav {:browse render-browse
                                :lesson render-lessons}))))
-
-(defn start
-  []
-  (reagent/render-component
-   [app]
-   (.getElementById js/document "app")))
+                             
+ (def start (partial com/start app))
