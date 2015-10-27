@@ -192,3 +192,15 @@
          [:input {:type type :id k :name k :value value :class class
                   :on-change #(swap-in! state [form-key k] assoc :dirty? true
                                                                  :value (get-value %))}]])))])
+                                                               
+(defn render
+  [state header modes]
+  (let [{:keys [error loading message mode]} @state]
+    [:div
+     header
+     (when error [:h3 "Error!"])
+     (when message [:span message])
+     (if loading
+       [:span "Loading..."]
+       (let [f (modes mode)]
+        (f state)))))                                                               
