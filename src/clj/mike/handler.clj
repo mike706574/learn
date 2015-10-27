@@ -135,7 +135,7 @@
           {{type-id :type-id} :params user :user}
           (to-response (api/delete-type! (repo db user) type-id)))
 
-  (GET "/api/type"
+  (GET "/api/type/:type-id"
        {{type-id :type-id} :params user :user}
        (to-response (api/get-type (repo db user) type-id)))
 
@@ -209,6 +209,10 @@
   (DELETE "/api/type/:type-id/lesson/:lesson-id/entity/:entity-id"
           {{:keys [type-id lesson-id entity-id]} :params user :user}
           (to-response (api/remove-from-lesson! (repo db user) type-id (parse-int lesson-id) (parse-int entity-id))))
+
+  (GET "/api/type/:type-id/lesson/:lesson-id/entities"
+          {{:keys [type-id lesson-id]} :params user :user}
+          (to-response (api/get-lesson-entities (repo db user) type-id (parse-int lesson-id))))
 
   ;; SESSIONS
   (POST "/api/type/:type-id/session"

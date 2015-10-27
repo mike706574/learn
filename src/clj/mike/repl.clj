@@ -19,7 +19,7 @@
                     :join true}))
     (println (str "You can view the site at http://localhost:" port))))
 
-(defn stop-server [] 
+(defn stop-server []
   (.stop @server)
   (reset! server nil))
 

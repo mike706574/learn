@@ -5,13 +5,24 @@
             [mike.component :as component]
             [lang.entity.api :as api]
             [reagent.core :as reagent]
-            [clojure.string :refer [blank?]]
+            [clojure.string :refer [blank? capitalize]]
             [cljs.core.async :refer [<!]]
             [lang.entity.http :refer [HttpEntityRepo]]))
 
 (enable-console-print!)
 
 (def repo (HttpEntityRepo. "http://localhost:8080/api/" "mike"))
+
+(def lesson-template {:name {:value ""
+                             :dirty? false
+                             :validate joe/not-blank?}
+                      :description {:value ""
+                                    :dirty? false
+                                    :validate joe/not-blank?}
+                      :length {:value "10"
+                               :dirty? false
+                               :type :number
+                               :validate joe/is-number?}})
 
 (defn load-lessons!
   [state type-id]
@@ -35,15 +46,14 @@
   [state]
   (loading! state)
   (go
-    (println "HI HI")
-    (let [{:keys [type-id lesson length]} @state
-          name (:v (:name lesson))
-          description (:v (:description lesson))
-          length (:v (:length lesson))
+    (let [{:keys [type-id new-lesson length]} @state
+          ;; TODO: this sucks
+          name (:value (:name new-lesson))
+          description (:value (:description new-lesson))
+          length (:value (:length new-lesson))
           {:keys [status body]} (<! (api/create-lesson! repo type-id name description length))]
-      (println "HI")
       (if (joe/ok? status)
-        (do (commit! state :name "" :description "" :length "")
+        (do (commit! state :new-lesson lesson-template)
             (load-lessons! state type-id))          
         (swap! state assoc :error true)))))
 
@@ -57,78 +67,85 @@
         (load-lessons! state type-id)          
         (error! state message)))))
 
-(def not-blank? (comp not blank?))
-
-(defn validate-property
-  [{:keys [v type required validate] :as property}] 
-  (assoc property :valid? (validate v)))
+(defn view-lesson!
+  [state lesson-id]
+  (loading! state) 
+  ;; 3 calls whhhhhhy
+  (go
+    (let [type-id (:type-id @state)
+          {:keys [status body message]} (<! (api/get-lesson repo type-id lesson-id))]
+      (if (joe/ok? status)
+        (let [lesson body
+              {:keys [status body message]} (<! (api/get-lesson-entities repo type-id lesson-id))]
+          (if (joe/ok? status)
+            (let [entities body
+                  {:keys [status body message]} (<! (api/get-type repo type-id))]
+              (if (joe/ok? status)
+                (done! state :mode :view :lesson-id lesson-id :lesson lesson :entities entities :type body)
+                (error! state message)))
+            (error! state message)))
+        (error! state message)))))
 
 (defn render-things
   [state]
-     (let [{:keys [type-id types lessons lesson] :as current-state} @state
-        validated-lesson (joe/fmap validate-property lesson)
-        all-valid? (every? #(:valid? (val %)) validated-lesson)]
+     (let [{:keys [type-id types lessons new-lesson] :as current-state} @state
+           [validated-lesson all-valid?] (joe/validate-form new-lesson)]
     [:div
-     (joe/fun-select
-      #(load-lessons! state %)
-      (joe/mapm (fn [{:keys [id label]}] [id label]) types)
-      type-id)
+     (joe/fun-select #(load-lessons! state %) (joe/mapm (fn [{:keys [id label]}] [id label]) types) type-id)
      [:h3 "Create a Lesson"]
-     [:ul
-      (doall (for [[k property] validated-lesson]
-               (let [{:keys [v dirty? valid?]} property]
-                 [:li {:key k}
-                  (joe/label k)
-                  [:input {:type "text" :id k :name k :value v
-                           :on-change #(swap-in! state [:lesson k] assoc :dirty? true :v (joe/get-value %))}]
-                  (when (and dirty? (not valid?)) [:span "INVALID!"])])))]
+     (joe/render-form state :new-lesson validated-lesson)
      [:input {:type "button"
               :id :create
               :disabled (not all-valid?) 
               :value "Create"
-              :on-click #(do (println "HEY HEY")
-                             (create-lesson! state))}]
+              :on-click #(create-lesson! state)}]
      [:h3 "Lessons"]
      (if (empty? lessons)
        [:span "No lessons stored."]
-       [:table
-      [:thead
-       [:tr
-        [:th {:key :id} "ID"]
-        [:th {:key :user} "User"]
-        [:th {:key :name} "Name"]
-        [:th {:key :description} "Description"]
-        [:th {:key :length} "Length"]
-        [:th {:key :delete} "Delete"]]]
-      [:tbody
-       (for [{:keys [id user name description length] :as lesson} lessons]
-         [:tr {:key id}
-          [:td {:key :id} id]
-          [:td {:key :user} user]
-          [:td {:key :name} name]
-          [:td {:key :description} description]
-          [:td {:key :length} length]
-          [:td {:key :delete} (joe/button :delete "Delete" #(delete-lesson! state id))]])]])]))
-     
+       (joe/render-table lessons [[:property :id]
+                                  [:property :user]
+                                  [:property :description]
+                                  [:property :length]
+                                  [:action :delete "Delete" delete-lesson! [state :id]]
+                                  [:action :view "View" view-lesson! [state :id]]]))]))
+
+(defn remove-from-lesson!
+  [state entity-id]
+  (loading! state)
+  (go (let [{:keys [type-id lesson-id]} @state
+            {:keys [status body message]} (<! (api/remove-from-lesson! repo type-id lesson-id entity-id))]
+        (if (joe/ok? status)
+          (view-lesson! state lesson-id)
+          (error! state message)))))
+
+(defn render-lesson
+  [state]
+  (let [{:keys [type-id lesson entities lesson-id type] :as current-state} @state
+        attributes (:attributes type)
+        columns (concat [[:property :id]]
+                        (mapv (fn [attr] [:property (keyword (:id attr))]) attributes)
+                        [[:action :delete "Remove" remove-from-lesson! [state :id]]])]
+    (joe/render-table entities columns)))
 
 (defn render
   [state]
-  (let [{:keys [error loading message]} @state]
+  (let [{:keys [error loading message mode]} @state]
     [:div
      component/nav
      (when error [:h3 "Error!"])
      (when message [:span message])
      (if loading
        [:span "LOADING"]
-       (render-things state))]))
+       (case mode
+         :browse (render-things state)
+         :view (render-lesson state)))]))
 
 (defn app
   []
   (println "Initializing...")
   (let [state (reagent/atom {:user "mike"
-                             :lesson {:name {:v "" :dirty? false :validate not-blank?}
-                                      :description {:v "" :dirty? false :validate not-blank?}
-                                      :length {:v "" :dirty? false :validate not-blank?}}
+                             :mode :browse
+                             :new-lesson lesson-template
                              :loading true})]
     (load-types! state)
     (fn []

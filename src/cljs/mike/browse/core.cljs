@@ -1,10 +1,10 @@
 (ns mike.browse.core
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [mike.common.core :as joe]
-            [mike.common.state :refer [loading! commit! done! error!]]
+            [mike.common.state :refer [loading! commit! done! error! swap-in!]]
             [mike.component :as component]
             [lang.entity.api :as api]
-            [clojure.string :refer [capitalize]]
+            [clojure.string :refer [blank? capitalize]]
             [reagent.core :as reagent]
             [cljs.core.async :refer [<!]]
             [lang.entity.http :refer [HttpEntityRepo]])) 
@@ -15,6 +15,12 @@
 (def repo (HttpEntityRepo. "http://localhost:8080/api/" "mike"))
 
 (defn get-type [type-id types] (joe/find-first #(= type-id (:id %)) types))
+
+(defn get-blank-entity
+  [type-id types]
+  (let [attributes (:attributes (get-type type-id types))]
+    (joe/mapm (fn [attribute]
+                [(:id attribute) {:value "" :dirty? false :validate joe/not-blank?}]) attributes)))
 
 (defn load-page!
   [state type-id page-number]
@@ -37,6 +43,15 @@
               (error! state message))))
         (error! state message)))))
 
+(defn load-type!
+  [state type-id]
+  (loading! state)
+  (go
+    (let [types (:types @state)
+          new-entity (get-blank-entity type-id types)]
+      (commit! state :type-id type-id :new-entity new-entity )
+      (load-page! state type-id 1))))
+
 (defn load-types!
   [state]
   (loading! state)
@@ -45,11 +60,10 @@
       (if (joe/ok? status)
         (let [type-id (:id (first body))
               types body]
-          (println "BODY:" body)
           (if (empty? types)
             (error! state "dude add some types")
-            (do (commit! state :types body :type-id type-id)
-                (load-page! state type-id 1)))) 
+            (do (commit! state :types body)
+                (load-type! state type-id)))) 
         (error! state message)))))
 
 (defn delete-entity!
@@ -68,21 +82,16 @@
         m (mod entity-count page-size)]
     (if (not= 0 m) (inc q) q)))
 
-(defn get-blank-entity
-  [type-id types]
-  (let [attributes (:attributes (get-type type-id types))]
-    (joe/mapm (fn [attribute] [(:id attribute) ""]) attributes)))
-
 (defn add-entity!
   [state]
   (loading! state)
   (go
-    (let [{:keys [type-id entity types page-number]} @state]
-      (let [{:keys [status body message]} (<! (api/add-entity! repo type-id entity))]
+    (let [{:keys [type-id new-entity types page-number]} @state
+          new-entity (joe/fmap :value new-entity)]
+      (let [{:keys [status body message]} (<! (api/add-entity! repo type-id new-entity))]
         (if (joe/ok? status)
           (let [blank-entity (get-blank-entity type-id types)]
-            ;; TODO: should these two state changes be applied together somehow?
-            (commit! state :entity blank-entity)
+            (commit! state :new-entity blank-entity)
             (load-page! state type-id page-number))
           (error! state message))))))
 
@@ -96,28 +105,27 @@
         (done! state :lessons body :mode :lesson :entity-id entity-id)
         (error! state message)))))
 
+(defn validate-property
+  [{:keys [value type required validate] :as property}] 
+  (assoc property :valid? (validate value)))
+
 (defn render-browse
   [state]
-  (let [{:keys [type-id types page-number entities page-size entity-count] :as current-state} @state
+  (let [{:keys [type-id types page-number entities new-entity page-size entity-count] :as current-state} @state
         {:keys [label attributes]} (get-type type-id types)
         page-count (get-page-count entity-count page-size)
-        type-options (joe/mapm (fn [{:keys [id label]}] [id label]) types)]
+        type-options (joe/mapm (fn [{:keys [id label]}] [id label]) types)
+        [validated-entity all-valid?] (joe/validate-form new-entity)]
     [:div
-     (joe/fun-select
-      #(load-page! state % 1)
-      type-options
-      type-id)
+     (joe/fun-select #(load-page! state % 1) type-options type-id)
      [:h3 "Add: " label]
-     [:ul
-      (doall
-       (for [attribute attributes]
-         (let [{:keys [id label]} attribute
-               attribute-name (name id)]
-           [:li {:key id}
-            [:label {:for id} label ": "]
-            (joe/text-box-in state id [:entity id])])))]
-     (joe/button :add "Add" #(add-entity! state))
-     
+     (joe/render-form state :new-entity validated-entity)
+     [:input {:type "button"
+              :id :create
+              :disabled (not all-valid?) 
+              :value "Add"
+              :on-click #(do (println "HEY HEY")
+                             (add-entity! state))}]
      [:h2 label]
      (if (= 0 page-count)
        [:p "No entities stored."]
@@ -163,53 +171,12 @@
   (let [{:keys [entity-id lessons]} @state]
     (if (empty? lessons)
       [:span "No lessons stored."]
-      [:table
-       [:thead
-        [:tr
-        [:th {:key :id} "ID"]
-         [:th {:key :user} "User"]
-        [:th {:key :name} "Name"]
-        [:th {:key :description} "Description"]
-        [:th {:key :length} "Length"]
-        [:th {:key :delete} ""]]]
-      [:tbody
-       (for [{:keys [id user name description length] :as lesson} lessons]
-         [:tr {:key id}
-          [:td {:key :id} id]
-          [:td {:key :user} user]
-          [:td {:key :name} name]
-          [:td {:key :description} description]
-          [:td {:key :length} length]
-          [:td {:key :add-to-lesson} (joe/button :add-to-lesson "Add to Lesson" #(add-to-lesson! state entity-id id))]])]])))
-
-;; [:table
-;;  [:thead
-;;   [:tr
-;;    (for [column columns]
-;;      (let [type (first column)
-;;            k (second column)
-;;            label (str (capitalize (name column)))]
-;;        [:th {:key k} label]))]]
-;;  [:tbody
-;;   (for [row rows]
-;;     [:tr
-;;      (for [column columns]
-;;       (let [type (first column)
-;;             k (second column)]
-;;         (case type
-;;           :property [:td {:key k} (k row)] 
-;;           :action (let [label (nth column 3)
-;;                         f (nth column 4)
-;;                         template (nth column 5) 
-;;                         args (map #(if (keyword? %) (% row) %) template)]
-;;                     (joe/button k label (apply f args))))))])]] 
-
-;; [[:property :id]
-;;  [:property :user]
-;;  [:property :name]
-;;  [:property :description]
-;;  [:property :length]
-;;  [:action :delete "Delete" add-to-lesson! [state entity-id :id]]]
+      (joe/render-table
+       lessons [[:property :id]
+                [:property :user]
+                [:property :description]
+                [:property :length]
+                [:action :add-to-lesson "Add to Lesson" add-to-lesson! [state entity-id :id]]]))))
 
 (defn render
   [state]

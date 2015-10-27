@@ -1,16 +1,18 @@
 (ns mike.common.core
-  (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [cljs-http.client :as httpok]
-            [clojure.string :refer [capitalize]]
-            [pet.http :as http]
-            [cljs.core.async :refer [<!]]))
+  (:require [mike.common.state :refer [swap-in!]]
+            [clojure.string :refer [blank? capitalize]]))
 
 (enable-console-print!)
 
-(def base-path "http://localhost:8080/api/")
+(def not-blank? (comp not blank?))
 
-(def tag-path (str base-path "tag"))
-(def tags-path (str base-path "tags"))
+(def is-number? (comp not js/isNaN))
+
+;; dis dont work
+(defn is-integer?
+  [s]
+  (and (is-number? s) (integer? (js/parseInt s))))
+
 
 (defn maps [f coll] (into #{} (map f coll)))
 (defn mapm [f coll] (into {} (map f coll)))
@@ -89,7 +91,6 @@
   (let [info nil
         title (:name info)
         label (get-label selected (:languages info))]
-    (println "OK" title)
     [:div
      [:h2 title]
      [:h5 label]
@@ -139,3 +140,55 @@
            :id id
            :value (get-in @state ks)
            :on-change #(swap! state assoc-in ks (get-value %))}])
+
+(defn render-table
+  [rows columns]
+  [:table
+   [:thead
+    [:tr
+     (for [column columns]
+       (let [type (first column)
+             k (second column)
+           label (str (capitalize (name k)))]
+         [:th {:key k} label]))]]
+   [:tbody
+    (for [row rows]
+      [:tr {:key (:id row)}
+       (for [column columns]
+         (let [type (first column)
+               k (second column)]
+           [:td {:key k}
+            (case type
+              :property (k row) 
+              :action (let [label (nth column 2)
+                            f (nth column 3)
+                            template (nth column 4) 
+                            args (map #(if (keyword? %) (% row) %) template)]
+                        (button k label #(apply f args))))]))])]])
+
+
+(defn validate-property
+  [{:keys [value type required validate] :as property}] 
+  (assoc property :valid? (validate value)))
+
+(defn validate-form
+  [properties]
+  (let [validated-properties (fmap validate-property properties)
+        all-valid? (every? #(:valid? (val %)) validated-properties)]
+    [validated-properties all-valid?]))
+
+(defn render-form
+  [state form-key validated-properties]
+  [:form
+   (doall
+    (for [[k property] validated-properties]
+      (let [{:keys [value dirty? valid? type] :or {type :text}} property
+            number? (= type :number)
+            empty-number? (and number? dirty? (blank? value))
+            invalid? (and dirty? (not valid?))
+            class (if (or invalid? empty-number?) "invalid" "")]
+        [:div {:key k}
+         (label k)
+         [:input {:type type :id k :name k :value value :class class
+                  :on-change #(swap-in! state [form-key k] assoc :dirty? true
+                                                                 :value (get-value %))}]])))])
