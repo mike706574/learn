@@ -168,4 +168,4 @@
       (com/app state xcom/nav {:browse render-browse
                                :lesson render-lessons}))))
                              
- (def start (partial com/start app))
+ (def start (com/boot app "app"))
