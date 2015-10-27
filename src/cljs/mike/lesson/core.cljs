@@ -1,7 +1,7 @@
 (ns mike.lesson.core
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [mike.common.core :as joe]
-            [mike.common.state :refer [loading! commit! done! error! swap-in!]]
+            [mike.common.state :refer [loading! commit! done! error!!]]
             [mike.component :as component]
             [lang.entity.api :as api]
             [reagent.core :as reagent]
@@ -139,8 +139,8 @@
     (load-types! state)
     (fn []
       (println "Rendering...")
-      (render state component/nav {:browse render-lessons
-                                   :view render-lesson}))))
+      (joe/render-app state component/nav {:browse render-lessons
+                                           :view render-lesson}))))
     
 (defn start
   []
