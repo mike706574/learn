@@ -142,5 +142,5 @@
       (println "Rendering...")
       (com/app state xcom/nav {:browse render-lessons
                                :view render-lesson}))))
-    
-(def start (partial com/start app))
+
+(def start (com/boot app "app"))
