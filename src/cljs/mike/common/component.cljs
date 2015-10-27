@@ -134,3 +134,5 @@
        [:span "Loading..."]
        (let [f (modes mode)]
         (f state)))))
+      
+(defn start[f] (reagent/render-component [f] (.getElementById js/document "app")))
