@@ -15,6 +15,7 @@
 ;; TODO: why keep this as state?
 (def repo (HttpEntityRepo. "http://localhost:8080/api/" "mike"))
 
+;; TODO: kill me
 (defn get-type [type-id types] (joe/find-first #(= type-id (:id %)) types))
 
 (defn get-blank-entity
@@ -77,6 +78,7 @@
         (load-page! state type-id 1)
         (error! state message)))))
 
+;; TODO: generic page count calculation
 (defn get-page-count
   [entity-count page-size]
   (let [q (quot entity-count page-size)
@@ -109,6 +111,7 @@
 (defn render-browse
   [state]
   (let [{:keys [type-id types page-number entities new-entity page-size entity-count] :as current-state} @state
+        ;; TODO: if types were a map, we wouldn't have to do such ucky things. build type-options with (keys types)
         {:keys [label attributes]} (get-type type-id types)
         page-count (get-page-count entity-count page-size)
         type-options (joe/mapm (fn [{:keys [id label]}] [id label]) types)
