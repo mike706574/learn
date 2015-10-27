@@ -71,9 +71,9 @@
 
 (defn view-lesson!
   [state lesson-id]
-  (loading! state) 
-  ;; 3 calls whhhhhhy
+  (loading! state)
   (go
+    ;; TODO: single api function to get lesson and its entities
     (let [type-id (:type-id @state)
           {:keys [status body message]} (<! (api/get-lesson repo type-id lesson-id))]
       (if (joe/ok? status)
@@ -81,6 +81,7 @@
               {:keys [status body message]} (<! (api/get-lesson-entities repo type-id lesson-id))]
           (if (joe/ok? status)
             (let [entities body
+                  ;; TODO: return a map from api/get-types. store it in state to make this call unnecessary
                   {:keys [status body message]} (<! (api/get-type repo type-id))]
               (if (joe/ok? status)
                 (done! state :mode :view :lesson-id lesson-id :lesson lesson :entities entities :type body)
