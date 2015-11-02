@@ -12,8 +12,7 @@
 
 (def nav 
   [:ul {:class "nav"}
-   [:li (link "add")]
+   [:li (link "flash")]
    [:li (link "browse")]
    [:li (link "lesson")]
-   [:li (link "types")]
-])
+   [:li (link "types")]])

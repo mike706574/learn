@@ -1,6 +1,7 @@
 (ns mike.common.component
   (:require [reagent.core :as reagent]
-            [mike.common.state :refer [swap-in!]]
+            [mike.common.state :refer [swap-in! commit!]]
+            [mike.common.core :as joe]
             [clojure.string :refer [blank? capitalize]]))
 
 ;; TODO: where do i belong?
@@ -72,9 +73,10 @@
            :on-change #(swap! state assoc k (get-value %))}])
 
 (defn label
-  [target]
-  [:label {:for target}
-   (str (capitalize (name target)) ": ")])
+  ([target]
+   (label target (capitalize (name target)))) 
+  ([target text]
+  [:label {:for target} (str text ": ")]))
 
 (defn text-box-in
   [state id ks] 
@@ -82,6 +84,16 @@
            :id id
            :value (get-in @state ks)
            :on-change #(swap! state assoc-in ks (get-value %))}])
+
+(defn build-action
+  [row column]
+  (let [f (nth column 3)
+        no-args? (= 4 (count column))]
+    (if no-args?
+      #(f row)
+      (let [template (nth column 4)
+            args (map #(if (keyword? %) (% row) %) template)]
+        #(apply f args)))))
 
 (defn table
   [rows columns]
@@ -91,7 +103,7 @@
      (for [column columns]
        (let [type (first column)
              k (second column)
-           label (str (capitalize (name k)))]
+             label (str (capitalize (name k)))]
          [:th {:key k} label]))]]
    [:tbody
     (for [row rows]
@@ -101,12 +113,20 @@
                k (second column)]
            [:td {:key k}
             (case type
-              :property (k row) 
-              :action (let [label (nth column 2)
-                            f (nth column 3)
-                            template (nth column 4) 
-                            args (map #(if (keyword? %) (% row) %) template)]
-                        (button k label #(apply f args))))]))])]])
+              :property (k row)
+              ;; TODO: change to button
+              :action (let [label (nth column 2)]
+                        (button k label (build-action row column))))]))])]])
+
+(defn validate-property
+  [{:keys [value type required validate] :as property}] 
+  (assoc property :valid? (validate value)))
+
+(defn validate-form
+  [properties]
+  (let [validated-properties (joe/fmap validate-property properties)
+        all-valid? (every? #(:valid? (val %)) validated-properties)]
+    [validated-properties all-valid?]))
 
 (defn form
   [state form-key validated-properties]
@@ -123,19 +143,71 @@
          [:input {:type type :id k :name k :value value :class class
                   :on-change #(swap-in! state [form-key k] assoc :dirty? true
                                                                  :value (get-value %))}]])))])
-                                                               
+(defn fun-form
+  [state heading form-key submit!]
+  (let [data (form-key @state)
+        [validated all-valid?] (validate-form data)]
+    [:div
+     [:h3 heading]
+     [:form
+     (doall
+      (for [[k property] validated]
+        (let [{:keys [value dirty? valid? type] :or {type :text}} property
+              number? (= type :number)
+            empty-number? (and number? dirty? (blank? value))
+            invalid? (and dirty? (not valid?))
+            class (if (or invalid? empty-number?) "invalid" "")]
+        [:div {:key k}
+         (label k)
+         [:input {:type type :id k :name k :value value :class class
+                  :on-change #(swap-in! state [form-key k] assoc :dirty? true :value (get-value %))}]])))]
+     [:input {:type "button"
+              :id :create
+              :disabled (not all-valid?) 
+              :value "Add"
+              :on-click #(submit! state)}]]))
+
 (defn app
   [state header modes]
   (let [{:keys [error loading message mode]} @state]
     [:div
      header
-     (when error [:h3 "Error!"])
-     (when message [:span message])
-     (if loading
-       [:span "Loading..."]
-       (let [f (modes mode)]
-        (f state)))]))
-      
+     (if (= :fatal mode)
+       [:div
+        [:h2 "Fatal error!"]
+        [:p message]]
+       [:div 
+        (when error [:h3 "Error!"])
+        (when message [:span message])
+        (if loading
+          [:span "Loading..."]
+          (let [f (modes mode)]
+            (f state)))])]))
+
+(defn tabs
+  [state header modes]
+  (let [{:keys [error fatal loading message mode]} @state]
+    [:div
+     header     
+     (if fatal
+       [:div
+        [:h2 "Fatal error!"]
+        [:p message]] 
+       [:div
+        [:ul {:class "nav"}
+         (for [m (keys modes)]
+           [:li {:key m}
+            (button
+             m
+             (if (= mode m) (str "[CURRENT]" (name m)) (name m))
+             #(commit! state :mode m))])]
+        (when error [:h3 "Error!"])
+        (when message [:span message])
+        (if loading
+          [:span "Loading..."]
+          (let [f (modes mode)]
+            (f state)))])]))
+
 (defn boot 
   [component id]
   (fn []

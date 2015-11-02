@@ -7,6 +7,8 @@
 
 (def is-number? (comp not js/isNaN))
 
+(def not-empty? (comp not empty?))
+
 ;; dis dont work
 (defn is-integer?
   [s]
@@ -16,6 +18,7 @@
 (defn mapm [f coll] (into {} (map f coll)))
 
 (defn ok? [status] (= (keyword status) :ok))
+(def bad? (comp not ok?))
 
 (defn find-first [f coll] (first (filter f coll)))
 
@@ -26,6 +29,10 @@
 (defn fmap
   [f m]
   (into (empty m) (for [[k v] m] [k (f v)])))
+
+(defn kmap
+  [f m]
+  (into (empty m) (for [[k v] m] [(f k) v])))
 
 (defn get-first-index
   [item coll]
@@ -40,13 +47,3 @@
         (if (= next-index (count v))
           (first v)
           (get v next-index))))))
-
-(defn validate-property
-  [{:keys [value type required validate] :as property}] 
-  (assoc property :valid? (validate value)))
-
-(defn validate-form
-  [properties]
-  (let [validated-properties (fmap validate-property properties)
-        all-valid? (every? #(:valid? (val %)) validated-properties)]
-    [validated-properties all-valid?]))

@@ -9,19 +9,21 @@
                  [mysql/mysql-connector-java "5.1.35"]
                  [org.clojure/java.jdbc "0.3.7"]
                  ;; ws
-                 [ring "1.4.0-RC1"]
+                 [ring "1.4.0"]
                  [ring-server "0.4.0"]
-                 [ring/ring-json "0.3.1"]
+                 [ring/ring-json "0.4.0"]
                  [ring/ring-defaults "0.1.5"]
+                 [ring-middleware-accept "2.0.3"]
                  [compojure "1.3.4"]
                  [hiccup "1.0.5"]
                  [clj-http "1.1.2"]
+                 [com.cemerick/url "0.1.1"]
+                 [prismatic/schema "1.0.3"]
                  ;; cljs
-                 [cljs-http "0.1.34"]
-                 [org.clojure/clojurescript "0.0-3308"]
+                 [cljs-http "0.1.37"]
+                 [org.clojure/clojurescript "1.7.145"]
                  [reagent "0.5.0"]
-                 [reagent-forms "0.5.1"]
-                 [org.clojars.pet/lang "0.0.2-SNAPSHOT"]]
+                 [reagent-forms "0.5.1"]]
   :plugins [[lein-ring "0.8.12"]
             [lein-cljsbuild "1.0.6"]
             [lein-beanstalk "0.2.7"]]
@@ -30,7 +32,7 @@
          :destroy mike.handler/destroy}
   :source-paths ["src/clj" "src/cljc"]
   :profiles {:uberjar {:aot :all}
-             :production {:ring {:open-browser? false, :stacktraces? false, :auto-reload? false}}
+             :production {:ring {:open-browser? false :stacktraces? false :auto-reload? false}}
              :dev {:dependencies [[ring-mock "0.1.5"] [ring/ring-devel "1.3.1"]]}}
   :cljsbuild {:builds {:browse-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/browse"]
                                     :compiler {:optimizations :none
@@ -59,13 +61,6 @@
                                                :pretty-print false
                                                :output-wrapper false
                                                :closure-warnings {:non-standard-jsdoc :off}}}
-                       :add-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/add"]
-                                 :compiler {:optimizations :none
-                                            :output-to "resources/public/js/add.js"
-                                            :output-dir "resources/public/js/add"
-                                            :asset-path "js/out"
-                                            :pretty-print true
-                                            :source-map true}}
                        :exp-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/exp"]
                                  :compiler {:optimizations :none
                                             :output-to "resources/public/js/exp.js"
@@ -95,6 +90,14 @@
                                               :asset-path "js/out"
                                               :pretty-print true
                                               :source-map true}}
+
+                       :type-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/type"]
+                                  :compiler {:optimizations :none
+                                             :output-to "resources/public/js/type.js"
+                                             :output-dir "resources/public/js/type"
+                                             :asset-path "js/out"
+                                             :pretty-print true
+                                             :source-map true}}
 
                        :lesson-dev {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/lesson"]
                                     :compiler {:optimizations :none

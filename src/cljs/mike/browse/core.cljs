@@ -4,23 +4,20 @@
             [mike.common.state :refer [loading! commit! done! error! swap-in!]]
             [mike.common.component :as com]
             [mike.component :as xcom]
-            [lang.entity.api :as api]
+            [mike.entity.api :as api]
             [clojure.string :refer [blank? capitalize]]
             [reagent.core :as reagent]
             [cljs.core.async :refer [<!]]
-            [lang.entity.http :refer [HttpEntityRepo]])) 
+            [mike.entity.http :refer [HttpEntityRepo]])) 
 
 (enable-console-print!)
 
 ;; TODO: why keep this as state?
 (def repo (HttpEntityRepo. "http://localhost:8080/api/" "mike"))
 
-;; TODO: kill me
-(defn get-type [type-id types] (joe/find-first #(= type-id (:id %)) types))
-
 (defn get-blank-entity
-  [type-id types]
-  (let [attributes (:attributes (get-type type-id types))]
+  [type]
+  (let [attributes (:attributes type)]
     (joe/mapm (fn [attribute]
                 [(:id attribute) {:value "" :dirty? false :validate joe/not-blank?}]) attributes)))
 
@@ -50,7 +47,7 @@
   (loading! state)
   (go
     (let [types (:types @state)
-          new-entity (get-blank-entity type-id types)]
+          new-entity (get-blank-entity (type-id types))]
       (commit! state :type-id type-id :new-entity new-entity )
       (load-page! state type-id 1))))
 
@@ -60,8 +57,8 @@
   (go
     (let [{:keys [status body message]} (<! (api/get-types repo))]
       (if (joe/ok? status)
-        (let [type-id (:id (first body))
-              types body]
+        (let [types body
+              type-id (keyword (:id (val (first types))))]
           (if (empty? types)
             (error! state "dude add some types")
             (do (commit! state :types body)
@@ -93,7 +90,7 @@
           new-entity (joe/fmap :value new-entity)]
       (let [{:keys [status body message]} (<! (api/add-entity! repo type-id new-entity))]
         (if (joe/ok? status)
-          (let [blank-entity (get-blank-entity type-id types)]
+          (let [blank-entity (get-blank-entity (type-id types))]
             (commit! state :new-entity blank-entity)
             (load-page! state type-id page-number))
           (error! state message))))))
@@ -110,22 +107,14 @@
 
 (defn render-browse
   [state]
-  (let [{:keys [type-id types page-number entities new-entity page-size entity-count] :as current-state} @state
-        ;; TODO: if types were a map, we wouldn't have to do such ucky things. build type-options with (keys types)
-        {:keys [label attributes]} (get-type type-id types)
+  (let [{:keys [type-id types page-number entities page-size entity-count] :as current-state} @state
+        {:keys [label attributes]} (type-id types)
         page-count (get-page-count entity-count page-size)
-        type-options (joe/mapm (fn [{:keys [id label]}] [id label]) types)
-        [validated-entity all-valid?] (joe/validate-form new-entity)]
+        type-options (joe/fmap :label types)]
+    (println type-options)
     [:div
      (com/fun-select #(load-page! state % 1) type-options type-id)
-     [:h3 "Add: " label]
-     (com/form state :new-entity validated-entity)
-     [:input {:type "button"
-              :id :create
-              :disabled (not all-valid?) 
-              :value "Add"
-              :on-click #(do (println "HEY HEY")
-                             (add-entity! state))}]
+     (com/fun-form state (str "Add: " label) :new-entity add-entity!)
      [:h2 label]
      (if (= 0 page-count)
        [:p "No entities stored."]
@@ -157,7 +146,11 @@
                           [:property :user]
                           [:property :description]
                           [:property :length]
-                          [:action :add-to-lesson "Add to Lesson" add-to-lesson! [state entity-id :id]]]))))
+                          [:action :add-to-lesson "Add to Lesson" add-to-lesson! [state entity-id :id]]
+
+
+
+                          ]))))
 
 (defn app
   []

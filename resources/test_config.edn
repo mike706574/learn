@@ -1,9 +1,4 @@
-{:sentence-repo-type :jdbc
- :sentence-repo-database {:subprotocol "mysql"
-                          :subname "//localhost:3306/lang_dev"
-                          :user "lang"
-                          :password "lang"}
- :entity-database {:subprotocol "mysql"
+{:entity-database {:subprotocol "mysql"
                    :subname "//localhost:3306/entity_dev"
                    :user "entity"
                    :password "entity"}}
