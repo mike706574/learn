@@ -364,7 +364,10 @@
         (is (= :ok status))
         (is (= [] body)))
       
-      (let [{:keys [status body exception]} (<!! (api/create-lesson! repo :en-it "Beginner" "A beginner lesson" 3))]
+      (let [{:keys [status body exception]} (<!! (api/create-lesson! repo :en-it
+                                                                     {:name "Beginner"
+                                                                      :description "A beginner lesson"
+                                                                      :length 3}))]
         (is (= :ok status))
         (let [{:keys [id name user description entities]} body]
           (is (= "mike" user))

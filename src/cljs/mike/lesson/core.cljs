@@ -1,8 +1,9 @@
 (ns mike.lesson.core
   (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [mike.common.core :as joe]
-            [mike.common.state :refer [loading! commit! done! error! fatal!]]
+  (:require [mike.common.misc :as misc]
+            [mike.common.state :refer [loading! commit! done! error! fatal! in-order!]]
             [mike.common.component :as com]
+            [mike.common.cookies :as cookies]
             [mike.component :as xcom]
             [mike.entity.api :as api]
             [reagent.core :as reagent]
@@ -16,42 +17,36 @@
 
 (def lesson-template {:name {:value ""
                              :dirty? false
-                             :validate joe/not-blank?}
+                             :validate misc/not-blank?}
                       :description {:value ""
                                     :dirty? false
-                                    :validate joe/not-blank?}
+                                    :validate misc/not-blank?}
                       :length {:value "10"
                                :dirty? false
                                :type :number
-                               :validate joe/is-number?}})
+                               :validate misc/is-number?}})
 
 (defn load-lessons!
   [state type-id]
   (go
     (let [{:keys [status body message]} (<! (api/get-lessons repo type-id))]
-      (if (joe/ok? status)
+      (if (misc/ok? status)
         (done! state :type-id type-id :lessons body)
         (error! state message)))))
 
 (defn get-blank-entity
   [type]
   (let [attributes (:attributes type)]
-    (joe/mapm (fn [attribute]
-                [(:id attribute) {:value "" :dirty? false :validate joe/not-blank?}]) attributes)))
-
-(defn get-blank-entity
-  [type-id types]
-  (get-blank-entity (get-type type-id types)))
-
-(defn get-type
-  [type-id types]
-  (get types (keyword type-id)))
+    (misc/mapm (fn [attribute]
+                [(:id attribute) {:value "" :dirty? false :validate misc/not-blank?}]) attributes)))
 
 (defn load-type!
   [state type-id]
   (loading! state)
   (go
-    (let [new-entity (get-blank-entity type (:types @state))] 
+    (let [types (:types @state)
+          type (types type-id)
+          new-entity (get-blank-entity type)] 
       (commit! state :type-id type-id :type type :new-entity new-entity)
       (load-lessons! state type-id))))
 
@@ -59,7 +54,7 @@
   [state]
   (go
     (let [{:keys [status body message]} (<! (api/get-types repo))]
-      (if (joe/ok? status)
+      (if (misc/ok? status)
         (if (empty? body)
           (fatal! state "No types!")
           (let [type-id (keyword (:id (val (first body))))]
@@ -67,20 +62,18 @@
             (load-type! state type-id)))
         (error! state message)))))
 
+(defn helper-create-lesson
+  [repo type-id new-lesson]
+  #(api/create-lesson! repo type-id (map :value new-lesson)))
+
 (defn create-lesson!
   [state]
-  (loading! state)
-  (go
-    (let [{:keys [type-id new-lesson length]} @state
-          ;; TODO: this sucks
-          name (:value (:name new-lesson))
-          description (:value (:description new-lesson))
-          length (:value (:length new-lesson))
-          {:keys [status body]} (<! (api/create-lesson! repo type-id name description length))]
-      (if (joe/ok? status)
-        (do (commit! state :new-lesson lesson-template)
-            (load-lessons! state type-id))          
-        (swap! state assoc :error true)))))
+  (in-order! state [[:creating-lesson true]
+                    ;; TODO: not readalbe
+                    [:created-lesson #(api/create-lesson! %1 %2 (misc/fmap :value %3)) [repo :type-id :new-lesson]]
+                    [:new-lesson lesson-template]
+                    [:lessons api/get-lessons [repo :type-id]]
+                    [:creating-lesson false]]))
 
 (defn delete-lesson!
   [state lesson-id]
@@ -88,7 +81,7 @@
   (go
     (let [type-id (:type-id @state)
           {:keys [status body message]} (<! (api/delete-lesson! repo type-id lesson-id))]
-      (if (joe/ok? status)
+      (if (misc/ok? status)
         (load-lessons! state type-id)          
         (error! state message)))))
 
@@ -98,7 +91,7 @@
   (go
     (let [type-id (:type-id @state)
           {:keys [status body message]} (<! (api/get-lesson repo type-id lesson-id))]
-      (if (joe/ok? status)
+      (if (misc/ok? status)
         (done! state :mode :view :lesson-id lesson-id :lesson body)
         (error! state message)))))
 
@@ -107,24 +100,37 @@
   (loading! state)
   (go (let [{:keys [type-id lesson-id]} @state
             {:keys [status body message]} (<! (api/remove-from-lesson! repo type-id lesson-id entity-id))]
-        (if (joe/ok? status)
+        (if (misc/ok? status)
           (view-lesson! state lesson-id)
           (error! state message)))))
+
 ;; views
+
+(defn page-header
+  [title]
+   [:div.row
+    [:div.col-lg-12
+     [:h1.page-header title]]])
+
 (defn render-lessons
   [state]
-  (println "render lessons")
-  (let [{:keys [type-id types lessons] :as current-state} @state]
-    [:div
-     (com/fun-select #(load-type! state %) (joe/fmap :label types) type-id)
-     (com/fun-form state "Create a Lesson" :new-lesson create-lesson!)
+  (let [{:keys [type-id types lessons creating-lesson]} @state]
+    [:div.container-fluid
+     (page-header "Lessons")
+     [:p "TODO: Move type selection somewhere else"]
+     (com/fun-select #(load-type! state %) (misc/fmap :label types) type-id) 
+
+     (com/form2 state "Create a Lesson" "Create" :new-lesson create-lesson!)
+     (when creating-lesson
+       [:p "Creating lesson..."]) 
      [:h3 "Lessons"]
      (if (empty? lessons)
        [:span "No lessons stored."]
-       (com/table lessons [[:property :id]
-                           [:property :user]
-                           [:property :description]
-                           [:property :length]
+       (com/table lessons [[:property :id "ID"]
+                           [:property :name "Name"]
+                           [:property :user "Creator"]
+                           [:property :description "Description"]
+                           [:property :length "Length"]
                            [:action :delete "Delete" delete-lesson! [state :id]]
                            [:action :view "View" view-lesson! [state :id]]]))]))
 
@@ -134,7 +140,7 @@
   (go
     (let [type-id (:type-id @state)
           {:keys [status body message]} (<! (api/add-to-lesson! repo type-id lesson-id entity-id))]
-      (if (joe/ok? status) 
+      (if (misc/ok? status) 
         (view-lesson! state lesson-id)
         (error! state message)))))
 
@@ -143,9 +149,9 @@
   (loading! state)
   (go
     (let [{:keys [type-id new-entity types page-number lesson-id]} @state
-          new-entity (joe/fmap :value new-entity)]
+          new-entity (misc/fmap :value new-entity)]
       (let [{:keys [status body message]} (<! (api/add-entity! repo type-id new-entity))]
-        (if (joe/ok? status)
+        (if (misc/ok? status)
           (let [blank-entity (get-blank-entity (type-id types))]
             (commit! state :new-entity blank-entity)
             (add-to-lesson! state (:id body) lesson-id))
@@ -157,22 +163,41 @@
         attributes (:attributes type)
         columns (concat [[:property :id]]
                         (mapv (fn [attr] [:property (keyword (:id attr))]) attributes)
-                        [[:action :delete "Remove" remove-from-lesson! [state :id]]])]
-    [:div 
-     (com/fun-form state "Add an entity to the lesson dude" :new-entity add-entity!)
-     (com/table (:entities lesson) columns)]))
+                        [[:action :delete "Remove" remove-from-lesson! [state :id]]])
+        {:keys [name entities]} lesson]
+    [:div
+     (page-header (str "Lesson: " name)) 
+     (com/button :to-sessions "Back to Lessons" #(commit! state :mode :browse)) 
+     (com/form2 state "Add an entity" "Add" :new-entity add-entity!)
+     [:div.row 
+        [:div.col-lg-12
+         [:h3 "Entities"]
+         (if (empty? entities)
+           [:p "No entities."]
+           (com/table entities columns))]]]))
+
+(defn redirect!
+  [url]
+  (-> js/document .-location
+      (set! url)))
 
 (defn app
-  []
-  (println "Initializing...")
-  (let [state (reagent/atom {:user "mike"
-                             :mode :browse
-                             :new-lesson lesson-template
-                             :loading true})]
-    (load-types! state)
-    (fn []
-      (println "Rendering...")
-      (com/app state xcom/nav {:browse render-lessons
-                               :view render-lesson}))))
+  [username]
+  (println "Initializing...") 
+  (let [logged-in? (cookies/get :logged-in)
+        username (cookies/get :username)]
+    (when (or (not logged-in?) (not username))
+      (redirect! "/login")) 
+    (let [state (reagent/atom {:user username
+                               :mode :browse
+                               :new-lesson lesson-template
+                               :loading true})] 
+      (load-types! state)
+      (fn []
+        (println "Rendering...")
+        (com/full-app state
+                      username
+                      {:browse render-lessons
+                       :view render-lesson})))))
 
 (def start (com/boot app "app"))

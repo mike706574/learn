@@ -1,7 +1,8 @@
 (ns mike.flash.core
   (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [mike.common.core :as joe]
-            [mike.common.state :refer [loading! commit! done! error! swap-in! fatal! merge!]]
+  (:require [mike.common.misc :as misc]
+            [mike.common.state :refer [loading! commit! done! error! swap-in! fatal! merge!
+                                       in-order!]]
             [mike.common.component :as com]
             [mike.component :as xcom]
             [mike.entity.api :as api]
@@ -28,7 +29,7 @@
   [state type-id]
   (commit! state :loading-lessons? true)
   (go (let [{:keys [status body message]} (<! (api/get-lessons repo type-id))]
-        (if (joe/ok? status)
+        (if (misc/ok? status)
           (commit! state :loading-lessons? false :lessons body)
           (error! state message)))))
 
@@ -36,11 +37,11 @@
   [state type-id]
   (commit! state :loading-sessions? true)
   (go (let [{:keys [status body message]} (<! (api/get-sessions repo type-id))] 
-        (if (joe/ok? status)
+        (if (misc/ok? status)
           (let [sessions (group-by :done body)]
             (merge! state {:loading-sessions? false
                            :active-sessions (get sessions false)
-                           :completed-sessions (get sessions true)})) 
+                           :completed-sessions (get sessions true)}))
           (error! state message)))))
 
 (defn answer-question!
@@ -50,7 +51,7 @@
     (let [{:keys [type-id session]} @state
           {:keys [id entity-id]} session
           {:keys [status body message]} (<! (api/record-answer! repo type-id id entity-id correct?))] 
-      (if (joe/ok? status)
+      (if (misc/ok? status)
         (done! state :session body)
         (error! state message)))))
 
@@ -58,13 +59,15 @@
   [state type-id]
   (load-sessions! state type-id)
   (load-lessons! state type-id)
-  (done! state :type-id type-id))
+  (done! state :type-id type-id :type
+
+         ((:types @state) type-id)))
 
 (defn load-types!
   [state]
   (loading! state)
   (go (let [{:keys [status body message]} (<! (api/get-types repo))]
-        (if (joe/ok? status) 
+        (if (misc/ok? status) 
           (if (empty? body)
             (fatal! state "No types found!")
             (let [type-id (key (first body))]
@@ -72,44 +75,6 @@
               (load-type! state type-id)))
           (fatal! state message)))))
 
-(defn resolve-arg
-  [state arg]
-  (cond (keyword? arg) (get state arg)
-        (vector? arg) (get-in state arg)
-        :else arg))
-
-(defn load!
-  [state k f args]
-  (loading! state)
-  (go (let [args (map #(resolve-arg state %) args)
-            {:keys [status body message]} (<! (apply f args))]
-        (if (joe/ok? status)
-          (done! state k body)
-          (error! state message)))))
-
-(def third #(nth % 2))
-
-;; TODO: this is sort of crazy?
-(defn in-order!
-  [state calls]
-  (loading! state)
-  (go (loop [remaining-calls calls
-             updated @state
-             changes {}]
-        (if (empty? remaining-calls)
-          (swap! state merge (assoc changes :loading false :error false))
-          (let [call (first remaining-calls)
-                k (first call)
-                ;; TODO: kind of hacky here
-                {:keys [status body message]} (if (keyword? (second call))
-                                                {:status :ok :body (second call)}
-                                                (let [f (second call)
-                                                      template (third call) 
-                                                      args (map #(resolve-arg updated %) template)]
-                                                  (<! (apply f args))))]
-            (if (joe/ok? status)
-              (recur (rest remaining-calls) (assoc updated k body) (assoc changes k body))
-              (error! state message)))))))
 
 (defn create-session!
   [state lesson-id]
@@ -143,6 +108,7 @@
          [:div
           [:p "Playing to " length] 
           [:p "Entity ID:" entity-id]
+          
           (com/button :correct "Correct" (fn [] (answer-question! state true))) 
           (com/button :wrong "Wrong" (fn [] (answer-question! state false)))])
        (com/button :new-question "Back to Sessions" (fn []
@@ -153,7 +119,7 @@
   [state]
   (let [{:keys [type-id types loading-sessions active-sessions
                 completed-sessions loading-lessons lessons]} @state 
-        type-options (joe/fmap :label types)]
+        type-options (misc/fmap :label types)]
     [:div
      (com/fun-select #(load-type! state (keyword %)) type-options type-id)
      (if loading-lessons

@@ -2,7 +2,7 @@
   (:require [reagent.core :as reagent]
             [mike.common.state :refer [swap-in! commit!]]
             [mike.common.component :as com]
-            [mike.common.core :as joe]
+            [mike.common.misc :as misc]
             [clojure.string :refer [blank? capitalize]]))
 
 (defn build-action-fn

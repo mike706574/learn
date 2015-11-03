@@ -1,4 +1,5 @@
 (ns mike.entity.http
+  (:refer-clojure :exclude [get])
   #?(:cljs (:require-macros [cljs.core.async.macros :refer [go]]))
   (:require #?(:clj [clojure.core.async :refer [<! <!! go]]
                :cljs [cljs.core.async :refer [<!]])
@@ -98,10 +99,8 @@
     (get user (build-url path "type" type-id "lesson" lesson-id "entities"))) 
   (get-lessons [_ type-id]
     (get user (build-url path "type" type-id "lessons")))
-  (create-lesson! [_ type-id name description length]
-    (post user (build-url path "type" type-id "lesson") {:name name
-                                                         :description description
-                                                         :length length}))
+  (create-lesson! [_ type-id lesson]
+    (post user (build-url path "type" type-id "lesson") lesson))
   (delete-lesson! [config type-id lesson-id]
     (delete user (build-url path "type" type-id "lesson" lesson-id)))
   (add-to-lesson! [_ type-id lesson-id entity-id]

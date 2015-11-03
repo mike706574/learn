@@ -1,6 +1,6 @@
 (ns mike.exp.core
   (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [mike.common.core :as joe]
+  (:require [mike.common.misc :as misc]
             [lang.sentence.api :as api :refer [yaks]]
             [reagent.core :as reagent]
             [cljs-http.client :as http]
@@ -16,7 +16,7 @@
 
 (defn get-label
   [selected languages]
-  (let [lang-map (joe/mapm (fn [x] [(:key x) x]) languages)
+  (let [lang-map (misc/mapm (fn [x] [(:key x) x]) languages)
         language (selected lang-map)]
     (:label language)))
 
@@ -27,7 +27,7 @@
 (defn swap-selection
   [state]
   (let [{:keys [selected keys languages]} state
-        next (joe/get-after keys selected)]
+        next (misc/get-after keys selected)]
     (go-to-selection next state)))
 
 (defn choose-set
@@ -59,7 +59,7 @@
   [state k]
   [:input {:type "text"
            :value (k @state)
-           :on-change #(swap! state assoc k (joe/get-value %))}])
+           :on-change #(swap! state assoc k (misc/get-value %))}])
 
 (defn button
   [label f]
@@ -85,9 +85,9 @@
     [:div 
      (when (not (nil? sentence))
        [:div 
-        (joe/yak-select2 #(do (choose-set % state) 
+        (misc/yak-select2 #(do (choose-set % state) 
                               (fetch-sentence state)))
-        (joe/flip-box2 title selected selected-title sentence #(swap! state swap-selection) #(fetch-sentence state))
+        (misc/flip-box2 title selected selected-title sentence #(swap! state swap-selection) #(fetch-sentence state))
         [:br]
         (button "Back" go-back)
         [:br]

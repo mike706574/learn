@@ -1,7 +1,10 @@
-(ns mike.common.core
-  (:require [clojure.string :refer [blank? capitalize]]))
+(ns mike.common.misc
+  (:require [clojure.string :refer [blank? capitalize]]
+            [goog.net.cookies :as cookies]))
 
 (enable-console-print!)
+
+(def third #(nth % 2))
 
 (def not-blank? (comp not blank?))
 

@@ -1,4 +1,5 @@
 (ns mike.dynamite
+  (:refer-clojure :exclude [replace])
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.set :refer [union]]
             [clojure.string :refer [join replace]]))

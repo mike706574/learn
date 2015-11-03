@@ -1,6 +1,6 @@
 (ns mike.ferret.core
   (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [mike.common.core :as joe]
+  (:require [mike.common.misc :as misc]
             [lang.sentence.api :as api :refer [yaks]]
             [reagent.core :as reagent]
             [cljs-http.client :as http]
@@ -10,17 +10,17 @@
 
 (defn get-tags
   [state]
-  (go (swap! state assoc :tags (<! (joe/get-tags :en-it)))))
+  (go (swap! state assoc :tags (<! (misc/get-tags :en-it)))))
 
 (defn get-sentences
   [state tag]
-  (go (swap! state assoc :sentences (<! (joe/get-sentences-for-tag :en-it tag)))))
+  (go (swap! state assoc :sentences (<! (misc/get-sentences-for-tag :en-it tag)))))
 
 (defn render
   [state]
-  (let [tags (joe/mapm (fn [tag] [tag tag]) (:tags @state))]
+  (let [tags (misc/mapm (fn [tag] [tag tag]) (:tags @state))]
     (println @state)
-    (joe/on-change-select #(get-sentences state (joe/get-value %)) tags)))
+    (misc/on-change-select #(get-sentences state (misc/get-value %)) tags)))
 
 (defn app
   []

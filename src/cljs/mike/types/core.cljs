@@ -1,6 +1,6 @@
 (ns mike.types.core
   (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [mike.common.core :as joe]
+  (:require [mike.common.misc :as misc]
             [mike.common.state :refer [loading! commit! done! error! swap-in!]]
             [mike.common.component :as com]
             [mike.component :as xcom]
@@ -18,7 +18,7 @@
   [state]
   (go
     (let [{:keys [status body]} (<! (api/get-types repo))]
-      (if (joe/ok? status)
+      (if (misc/ok? status)
         (commit! state :types body)
         (error! state "ERROR!")))))
 
@@ -26,7 +26,7 @@
   [state type-id]
   (go
     (let [{:keys [status body]} (<! (api/delete-type! repo type-id))]
-      (if (joe/ok? status)
+      (if (misc/ok? status)
         (do
           (done! state :message (str "Deleted type: " type-id))
           (load-types! state))
@@ -70,7 +70,7 @@
 
 (defn all-values-not-blank?
   [m ks]
-  (every? #(joe/not-blank? (% m)) ks))
+  (every? #(misc/not-blank? (% m)) ks))
 
 (defn all-maps-not-blank?
   [ms ks]
@@ -116,9 +116,9 @@
                 type {:id type-id
                       :label (:value label)
                       :description (:value description)
-                      :attributes (map #(joe/fmap :value %) attributes)}
+                      :attributes (map #(misc/fmap :value %) attributes)}
                 {:keys [status body message]} (<! (api/create-type! repo type))]
-            (if (joe/ok? status)
+            (if (misc/ok? status)
               (do
                 (done! state :message (str "Created type: " type-id)
                        :id (:value "")

@@ -1,4 +1,5 @@
 (ns mike.http
+  (:refer-clojure :exclude [get]) 
   #?(:cljs (:require-macros [cljs.core.async.macros :refer [go]]))
   (:require [clojure.walk :refer [keywordize-keys]]
             #?(:clj [clojure.data.json :as json]) 

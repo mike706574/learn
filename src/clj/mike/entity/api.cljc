@@ -32,7 +32,7 @@
 
   (get-lessons [repo type-id] "Get all lessons.")
   
-  (create-lesson! [repo type-id name description length] "Create a lesson.")
+  (create-lesson! [repo type-id lesson] "Create a lesson.")
   (delete-lesson! [repo type-id lesson-id] "Delete a lesson.")
   (add-to-lesson! [repo type-id name description] "Add an entity to a lesson.")
   (remove-from-lesson! [repo type-id lesson-id entity-id] "Remove an entity from a lesson.")

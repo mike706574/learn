@@ -1,4 +1,7 @@
-(ns mike.common.state)
+(ns mike.common.state
+  (:require-macros [cljs.core.async.macros :refer [go]])
+  (:require [cljs.core.async :refer [<!]]
+            [mike.common.misc :as misc]))
 
 (defn loading! [state] (swap! state assoc :loading true))
 
@@ -35,3 +38,53 @@
 
 (def start-loading (partial loading-map true))
 (def done-loading (partial loading-map false))
+
+(defn resolve-arg
+  [state arg]
+  (cond (keyword? arg) (get state arg)
+        (vector? arg) (get-in state arg)
+        :else arg))
+
+(defn load!
+  [state k f args]
+  (loading! state)
+  (go (let [args (map #(resolve-arg state %) args)
+            {:keys [status body message]} (<! (apply f args))]
+        (if (misc/ok? status)
+          (done! state k body)
+          (error! state message)))))
+
+(defn snickerdoodle?
+  [call]
+  (let [thing (second call)]
+    (println "THING:" thing)
+    (println (type thing)) 
+    (println (str (type thing)) )
+    (println (ifn? thing))
+    (or (keyword? thing)
+        (map? thing)
+        (not (ifn? thing))
+
+
+        )))
+
+(defn in-order!
+  [state calls]
+  (loading! state)
+  (go (loop [remaining-calls calls
+             updated @state
+             changes {}]
+        (if (empty? remaining-calls)
+          (swap! state merge (assoc changes :loading false :error false))
+          (let [call (first remaining-calls)
+                k (first call)
+                ;; TODO: kind of hacky here
+                {:keys [status body message]} (if (snickerdoodle? call)
+                                                {:status :ok :body (second call)}
+                                                (let [f (second call)
+                                                      template (misc/third call) 
+                                                      args (map #(resolve-arg updated %) template)]
+                                                  (<! (apply f args))))]
+            (if (misc/ok? status)
+              (recur (rest remaining-calls) (assoc updated k body) (assoc changes k body))
+              (error! state message)))))))

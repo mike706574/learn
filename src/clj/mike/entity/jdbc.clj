@@ -1,4 +1,5 @@
 (ns mike.entity.jdbc
+  (:refer-clojure :exclude [replace])
   (:require [mike.dynamite :as dyn]
             [mike.entity.api :refer [EntityRepo]]
             [schema.core :as s]
@@ -494,13 +495,9 @@
 
 ;: TODO: use map with lesson props?
 (deft create-lesson!
-  [config type-id user name description length]
+  [config type-id user lesson]
   (let [row-count (dyn/count-rows config (lesson-table type-id))
-        prepared-lesson {:name name
-                         :user user
-                         :length length
-                         :description description
-                         :created nil}
+        prepared-lesson (assoc lesson :user user :created nil)
         lesson-id (dyn/insert! config (lesson-table type-id) prepared-lesson)]
     {:status :ok :body (select-lesson-info config type-id lesson-id)}))
 
@@ -642,8 +639,8 @@
   (get-lesson-entities [_ type-id lesson-id] (get-lesson-entities config type-id lesson-id))
   (get-lessons [_ type-id] (get-lessons config type-id))
   
-  (create-lesson! [_ type-id name description length]
-    (create-lesson! config type-id user name description length))
+  (create-lesson! [_ type-id lesson]
+    (create-lesson! config type-id user lesson))
   (delete-lesson! [_ type-id lesson-id]
     (delete-lesson! config type-id lesson-id))
   (add-to-lesson! [_ type-id lesson-id entity-id] (add-to-lesson! config type-id lesson-id entity-id))

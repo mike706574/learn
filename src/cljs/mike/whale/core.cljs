@@ -1,8 +1,7 @@
 (ns mike.whale.core
   (:require-macros [cljs.core.async.macros :refer [go]])
-  (:require [mike.common.core :as joe]
-            [reagent.core :as reagent]
-
+  (:require [mike.common.misc :as misc]
+            [reagent.core :as reagent] 
             [cljs.core.async :refer [<!]]))
 
 (enable-console-print!)

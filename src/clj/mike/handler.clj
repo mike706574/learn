@@ -96,6 +96,35 @@
 
 (def db (:entity-database test-config))
 
+(defn page
+  [title filename app]
+  (html5
+   [:head
+    [:meta {:charset "utf-8"}]
+    [:meta {:http-equiv "X-UA-Compatible", :content "IE=edge"}]
+    [:meta
+     {:name "viewport", :content "width=device-width, initial-scale=1"}]
+    [:meta {:name "description", :content ""}]
+    [:meta {:name "author", :content ""}]
+    [:title title]
+    "<!-- Bootstrap Core CSS -->"
+    [:link {:href "css/bootstrap.min.css", :rel "stylesheet"}]
+    "<!-- Custom CSS -->"
+    [:link {:href "css/sb-admin.css", :rel "stylesheet"}]
+    "<!-- Custom Fonts -->"
+    [:link
+     {:href "font-awesome/css/font-awesome.min.css",
+      :rel "stylesheet",
+      :type "text/css"}]
+    [:script {:src "https://code.jquery.com/jquery-2.1.1.min.js"}]
+    [:script {:src "https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"}]]
+   [:body
+    [:div#app]
+    [:script {:type "text/javascript" :src (str "/js/" filename "/goog/base.js")}]
+    [:script {:type "text/javascript" :src (str "/js/" filename ".js")}]
+    [:script {:type "text/javascript"} (str "goog.require(\"" app  ".core\");")]
+    [:script {:type "text/javascript"} (str app ".core.start();")]]))
+
 (defn head
   [title]
   [:head
@@ -103,7 +132,7 @@
    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
    (include-css "css/mike.css")
    [:link {:type "text/css", :href "/css/mike.css", :rel "stylesheet"}]
-   [:title title]])
+   [:title title]]) 
 
 (defn resource-view
   [a]
@@ -183,6 +212,7 @@
   (GET "/flash" [] (reagent-dev "Flash" "flash" "mike.flash"))
   (GET "/browse" [] (reagent-dev "Browse" "browse" "mike.browse"))
   (GET "/lesson" [] (reagent-dev "Lesson" "lesson" "mike.lesson"))
+  (GET "/test" [] (page "Lesson" "lesson" "mike.lesson"))
 
   (route/not-found not-found-page))
 
@@ -261,10 +291,8 @@
        (to-response (api/get-lessons (repo db user) type-id) accept))
     
   (POST "/api/type/:type-id/lesson"
-        {{:keys [name description length] :as body} :body {type-id :type-id} :params user :user accept :accept}
-        (println "HEY" body)
-        (println name description length)
-        (to-response (api/create-lesson! (repo db user) type-id name description (parse-int length)) accept))
+        {body :body {type-id :type-id} :params user :user accept :accept}
+        (to-response (api/create-lesson! (repo db user) type-id body) accept))
 
   (DELETE "/api/type/:type-id/lesson/:lesson-id"
        {{:keys [type-id lesson-id]} :params user :user accept :accept}
