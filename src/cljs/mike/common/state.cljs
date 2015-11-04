@@ -78,13 +78,16 @@
           (swap! state merge (assoc changes :loading false :error false))
           (let [call (first remaining-calls)
                 k (first call)
-                ;; TODO: kind of hacky here
+                ;; TODO: kind of hacky here refactor it
                 {:keys [status body message]} (if (snickerdoodle? call)
                                                 {:status :ok :body (second call)}
                                                 (let [f (second call)
                                                       template (misc/third call) 
-                                                      args (map #(resolve-arg updated %) template)]
-                                                  (<! (apply f args))))]
+                                                      args (map #(resolve-arg updated %) template)
+                                                      has-4? (= 4 (count call))]
+                                                  (if (and has-4? (= :no-channel (nth call 3))) 
+                                                    {:status :ok :body (apply f args)}
+                                                    (<! (apply f args)))))]
             (if (misc/ok? status)
               (recur (rest remaining-calls) (assoc updated k body) (assoc changes k body))
               (error! state message)))))))

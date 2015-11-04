@@ -1,6 +1,6 @@
-(ns mike.entity.jdbc-test
+7(ns mike.entity.jdbc-test
   (:require [mike.entity.api :as api]
-            [mike.entity.jdbc :refer [create! destroy! create-user!] :as jdbc]
+            [mike.entity.jdbc :refer [create! destroy!] :as jdbc]
             [mike.dynamite :as dynamite]
             [clojure.core.async :refer [<!!]]
             [clojure.test :refer :all]
@@ -511,6 +511,39 @@
       (let [{:keys [status body]} (<!! (api/get-lessons repo :en-it))]
         (is (= :ok status))
         (is (= [] body)))
+
+      (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))      
+      (destroy! config))))
+
+
+
+
+
+
+
+
+(deftest huh
+  (testing "lessons? what?"
+    (let [$entity-id (atom nil)
+          $lesson-id (atom nil)
+          $session-id (atom nil)
+          entity {:english "Hello!" :italian "Buongiorno!"} ]
+      (create! config)
+      (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
+      
+      (let [{:keys [status body]} (<!! (api/add-entity! repo :en-it entity))]
+        (is (= :ok status))
+        (reset! $entity-id (:id body)))
+
+      (let [{:keys [status body]} (<!! (api/get-lessons repo :en-it))]
+        (is (= :ok status))
+        (is (= [] body)))
+      
+      (let [{:keys [status body exception]} (<!! (api/create-lesson! repo :en-it
+                                                                     {:name "Beginner"
+                                                                      :description "A beginner lesson"
+                                                                      :length 3
+                                                                      :start ""}))])
 
       (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))      
       (destroy! config))))

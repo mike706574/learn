@@ -107,23 +107,17 @@
     [:meta {:name "description", :content ""}]
     [:meta {:name "author", :content ""}]
     [:title title]
-    "<!-- Bootstrap Core CSS -->"
     [:link {:href "css/bootstrap.min.css", :rel "stylesheet"}]
-    "<!-- Custom CSS -->"
     [:link {:href "css/sb-admin.css", :rel "stylesheet"}]
-    "<!-- Custom Fonts -->"
-    [:link
-     {:href "font-awesome/css/font-awesome.min.css",
-      :rel "stylesheet",
-      :type "text/css"}]
-    [:script {:src "https://code.jquery.com/jquery-2.1.1.min.js"}]
-    [:script {:src "https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"}]]
+    [:link {:href "font-awesome/css/font-awesome.min.css",:rel "stylesheet",:type "text/css"}]]
    [:body
     [:div#app]
     [:script {:type "text/javascript" :src (str "/js/" filename "/goog/base.js")}]
     [:script {:type "text/javascript" :src (str "/js/" filename ".js")}]
     [:script {:type "text/javascript"} (str "goog.require(\"" app  ".core\");")]
-    [:script {:type "text/javascript"} (str app ".core.start();")]]))
+    [:script {:type "text/javascript"} (str app ".core.start();")]
+    [:script {:type "text/javascript" :src "js/jquery.js"}]
+    [:script {:type "text/javascript" :src "js/bootstrap.min.js"}]]))
 
 (defn head
   [title]
@@ -211,8 +205,7 @@
   (GET "/type" [] (reagent-dev "Type" "type" "mike.types"))
   (GET "/flash" [] (reagent-dev "Flash" "flash" "mike.flash"))
   (GET "/browse" [] (reagent-dev "Browse" "browse" "mike.browse"))
-  (GET "/lesson" [] (reagent-dev "Lesson" "lesson" "mike.lesson"))
-  (GET "/test" [] (page "Lesson" "lesson" "mike.lesson"))
+  (GET "/lesson" [] (page "Lesson" "lesson" "mike.lesson"))
 
   (route/not-found not-found-page))
 
@@ -292,6 +285,7 @@
     
   (POST "/api/type/:type-id/lesson"
         {body :body {type-id :type-id} :params user :user accept :accept}
+        (println "BODY:" body)
         (to-response (api/create-lesson! (repo db user) type-id body) accept))
 
   (DELETE "/api/type/:type-id/lesson/:lesson-id"

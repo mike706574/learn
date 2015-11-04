@@ -40,14 +40,25 @@
     (misc/mapm (fn [attribute]
                 [(:id attribute) {:value "" :dirty? false :validate misc/not-blank?}]) attributes)))
 
+(defn get-lesson-template
+  [type-id types]
+  (let [type (types type-id)
+        attributes (:attributes type)
+        options (misc/mapm (fn [{:keys [id label]}] [id label]) attributes)]
+    (assoc lesson-template :start {:value ""
+                                   :dirty? false
+                                   :type :select
+                                   :options options})))
+
 (defn load-type!
   [state type-id]
   (loading! state)
   (go
     (let [types (:types @state)
           type (types type-id)
-          new-entity (get-blank-entity type)] 
-      (commit! state :type-id type-id :type type :new-entity new-entity)
+          new-entity (get-blank-entity type)
+          new-lesson (get-lesson-template type-id types)]
+      (commit! state :type-id type-id :type type :new-entity new-entity :new-lesson new-lesson)
       (load-lessons! state type-id))))
 
 (defn load-types!
@@ -62,18 +73,23 @@
             (load-type! state type-id)))
         (error! state message)))))
 
-(defn helper-create-lesson
-  [repo type-id new-lesson]
-  #(api/create-lesson! repo type-id (map :value new-lesson)))
+(defn go-create-lesson!
+  [repo type-id lesson]
+  (let [lesson (misc/fmap :value lesson)
+        lesson (if (blank? (:start lesson))
+                 (dissoc lesson :start)
+                 lesson)]
+    (api/create-lesson! repo type-id lesson)))
 
 (defn create-lesson!
   [state]
-  (in-order! state [[:creating-lesson true]
-                    ;; TODO: not readalbe
-                    [:created-lesson #(api/create-lesson! %1 %2 (misc/fmap :value %3)) [repo :type-id :new-lesson]]
-                    [:new-lesson lesson-template]
-                    [:lessons api/get-lessons [repo :type-id]]
-                    [:creating-lesson false]]))
+  (in-order!
+   state
+   [[:creating-lesson true]
+    [:created-lesson go-create-lesson! [repo :type-id :new-lesson]]
+    [:new-lesson get-lesson-template [:type-id :types] :no-channel]
+    [:lessons api/get-lessons [repo :type-id]]
+    [:creating-lesson false]]))
 
 (defn delete-lesson!
   [state lesson-id]
@@ -159,13 +175,15 @@
 
 (defn render-lesson
   [state]
+  (println "RENDERING LESSON!!!")
   (let [{:keys [type-id lesson entities lesson-id type] :as current-state} @state
         attributes (:attributes type)
         columns (concat [[:property :id]]
                         (mapv (fn [attr] [:property (keyword (:id attr))]) attributes)
                         [[:action :delete "Remove" remove-from-lesson! [state :id]]])
-        {:keys [name entities]} lesson]
-    [:div
+        {:keys [name start length entities]} lesson]
+    (println "START:" start "LENGTH:" length)
+    [:div.container-fluid
      (page-header (str "Lesson: " name)) 
      (com/button :to-sessions "Back to Lessons" #(commit! state :mode :browse)) 
      (com/form2 state "Add an entity" "Add" :new-entity add-entity!)
@@ -190,6 +208,7 @@
       (redirect! "/login")) 
     (let [state (reagent/atom {:user username
                                :mode :browse
+                               
                                :new-lesson lesson-template
                                :loading true})] 
       (load-types! state)
@@ -201,3 +220,12 @@
                        :view render-lesson})))))
 
 (def start (com/boot app "app"))
+
+
+;; (defn init
+;;   [state]
+;;   (load-types! state)
+;;   (swap! state assoc :mode browse :new-lesson lesson-template))
+
+;; (def start #(com/boot2 "app" init {:browse render-lessons
+;;                                    :view render-lesson}))

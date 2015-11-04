@@ -2,6 +2,7 @@
   (:require [reagent.core :as reagent]
             [mike.common.state :refer [swap-in! commit!]]
             [mike.common.misc :as misc]
+            [mike.common.cookies :as cookies]
             [clojure.string :refer [blank? capitalize]]))
 
 ;; TODO: where do i belong?
@@ -138,9 +139,16 @@
       [:tr {:key (:id row)}
        (for [col cols] (build-td row col))])]])
 
+(defn validate-selection
+  [options value]
+  (or (blank? value) (contains? (misc/maps key options) value)))
+
 (defn validate-property
-  [{:keys [value type required validate] :as property}] 
-  (assoc property :valid? (validate value)))
+  [{:keys [value type required validate options] :as property}]
+  (let [valid? (if (= :select type)
+                 (validate-selection options value)
+                 (validate value))]
+    (assoc property :valid? valid?)))
 
 (defn validate-form
   [properties]
@@ -248,6 +256,7 @@
           (if-let [f (modes mode)]
             (f state) 
             (render-fatal "Invalid mode: " (name mode))))])]))
+
 
 (defn boot 
   [component id]
@@ -451,6 +460,21 @@
     (sub-app state modes)
     (modal state)]]) 
 
+(defn render-select
+  [state form-key k property]
+  (let [{:keys [value dirty? valid? options]} property
+        invalid? (and dirty? (not valid?))
+        class (if invalid? "form-group has-error" "form-group")
+]
+    (println "OK")
+    (println value)
+    [:div {:key k class class}
+     [:label {:for k} (labelize k)]
+     [:select.form-control {:on-change #(swap-in! state [form-key k] assoc :dirty? true :value (get-value %))
+                            :value value}
+      [:option {:k :none :value nil} "None"]
+      (map build-option options)]]))
+
 (defn form2
   [state heading label form-key submit!]
   (let [data (form-key @state)
@@ -458,20 +482,55 @@
     [:div
      [:h3 heading]
      [:form
-     (doall
-      (for [[k property] validated]
-        (let [{:keys [value dirty? valid? type] :or {type :text}} property
-              number? (= type :number)
-              empty-number? (and number? dirty? (blank? value))
-              invalid? (and dirty? (not valid?))
-              class (if (or invalid? empty-number?) "form-group has-error" "form-group")]
-          [:div {:key k :class class}
-           [:label {:for k} (labelize k)]
-           [:input.form-control
-            {:type type :id k :name k :value value :class class
-             :on-change #(swap-in! state [form-key k] assoc :dirty? true :value (get-value %))}]])))]
-     [:button.btn.btn-default {:type "button"
-                               :id :create
-                               :disabled (not all-valid?) 
-                               :value "Add"
-                               :on-click #(submit! state)} label]]))
+      (doall
+       (for [[k property] validated]
+         (let [{:keys [value dirty? valid? type] :or {type :text}} property]
+           (if (= :select (keyword type))
+             (render-select state form-key  k property)
+             (let [number? (= type :number)
+                   empty-number? (and number? dirty? (blank? value))
+                   invalid? (and dirty? (not valid?))
+                   class (if (or invalid? empty-number?) "form-group has-error" "form-group")] 
+               [:div {:key k :class class}
+                [:label {:for k} (labelize k)]
+                [:input.form-control
+                 {:type type
+                  :id k
+                  :name k
+                  :value value
+                  :class class
+                  :on-change #(swap-in! state [form-key k] assoc :dirty? true :value (get-value %))
+
+                  }]])))))
+      [:button.btn.btn-default {:type "button"
+                                :id :create
+                                :disabled (not all-valid?) 
+                                :value "Add"
+                                :on-click #(submit! state)} label]]]))
+
+;; (defn redirect!
+;;   [url]
+;;   (-> js/document .-location
+;;       (set! url)))
+
+;; (defn boot2-component
+;;   [init modes]
+;;   (println "Initializing...") 
+;;   (let [logged-in? (cookies/get :logged-in)
+;;         username (cookies/get :username)]
+;;     (when (or (not logged-in?) (not username))
+;;       (redirect! "/login")) 
+;;     (let [state (reagent/atom {:username username
+;;                                :loading true})]
+;;       (init state)
+;;       (fn []
+;;         (println "Rendering...")
+;;         (full-app state username modes)))))
+
+;; (defn boot2
+;;   [id init modes]
+;;   (println "BOOT2")
+;;   (fn []
+;;     (reagent/render-component 
+;;       [(partial boot2-component init modes)] 
+;;       (.getElementById js/document id))))

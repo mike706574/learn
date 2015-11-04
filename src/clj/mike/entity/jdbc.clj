@@ -142,10 +142,12 @@
                      "(id int not null auto_increment primary key, " 
                      "name varchar(64) not null, "
                      "user varchar(32) not null, "
+                     "start varchar(64) null, "
                      "length int not null, "
                      "description varchar(256) not null, "
                      "created timestamp not null default '0000-00-00 00:00:00', "
-                     "modified timestamp not null default current_timestamp on update current_timestamp)"
+                     "modified timestamp not null default current_timestamp on update current_timestamp, "
+                     "foreign key (start) references " attribute-table "(id) on delete cascade)" 
                      "default character set utf8 collate utf8_unicode_ci")]
     (jdbc/execute! config [command])))
 
@@ -169,14 +171,14 @@
                      (answer-table type-id)
                      "(id int not null, "
                      "user varchar(32) not null, "
+                     "start varchar(64) null, "
                      "correct int not null, "
                      "total int not null, "
                      "created timestamp not null default '0000-00-00 00:00:00', "
                      "modified timestamp not null default current_timestamp on update current_timestamp, "
-                     "primary key (id, user), "
-                     "foreign key (id) references "
-                     (entity-table type-id)
-                     "(id) on delete cascade) "
+                     "primary key (id, start, user), "
+                     "foreign key (id) references " (entity-table type-id) "(id) on delete cascade, "
+                     "foreign key (start) references " attribute-table "(id) on delete cascade) "
                      "default character set utf8 collate utf8_unicode_ci")]
     (jdbc/execute! config [command])))
 
@@ -189,18 +191,16 @@
                      "entity_id int not null, "
                      "user varchar(32) not null, "
                      "correct int not null, "
+                     "start varchar(64) null, "
                      "total int not null, "
                      "length int not null, "
                      "done bool not null, "
                      "created timestamp not null default '0000-00-00 00:00:00', "
                      "modified timestamp not null default current_timestamp on update current_timestamp, "
                      "primary key (id),"
-                     "foreign key (lesson_id) references "
-                     (lesson-table type-id)
-                     "(id) on delete cascade, "
-                     "foreign key (entity_id) references "
-                     (entity-table type-id)
-                     "(id) on delete cascade)"
+                     "foreign key (lesson_id) references " (lesson-table type-id) "(id) on delete cascade, "
+                     "foreign key (entity_id) references " (entity-table type-id) "(id) on delete cascade, "
+                     "foreign key (start) references " attribute-table "(id) on delete cascade) " 
                      "default character set utf8 collate utf8_unicode_ci")]
     (jdbc/execute! config [command])))
 
@@ -226,7 +226,7 @@
           type-info (-> type-spec
                         (dissoc :attributes)
                         (assoc :id type-name
-                               :user user
+                              :user user
                                :created nil))]
       (jdbc/insert! conn type-table type-info)
       (doseq [attribute-spec (:attributes type-spec)]
@@ -241,8 +241,6 @@
       (create-lesson-entity-table! conn type-id)
       (create-answer-table! conn type-id)
       (create-session-table! conn type-id))))
-
-
 
 (defn create-type!
   [config user {:keys [id attributes] :as type-spec}]
@@ -493,9 +491,9 @@
   (let [lessons (dyn/select-all config (lesson-table type-id))]
     {:status :ok :body lessons}))
 
-;: TODO: use map with lesson props?
 (deft create-lesson!
   [config type-id user lesson]
+  (println "LEEZZON:" lesson)
   (let [row-count (dyn/count-rows config (lesson-table type-id))
         prepared-lesson (assoc lesson :user user :created nil)
         lesson-id (dyn/insert! config (lesson-table type-id) prepared-lesson)]
