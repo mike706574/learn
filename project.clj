@@ -106,7 +106,13 @@
                                                :output-dir "resources/public/js/lesson"
                                                :asset-path "js/out"
                                                :pretty-print true
-                                               :source-map true}} 
+                                               :source-map true}}
+                       :lesson-prod {:source-paths ["src/clj" "src/cljs/mike/common" "src/cljs/mike/lesson"]
+                                     :compiler {:output-to "resources/public/js/lesson.js"
+                                                :optimizations :advanced
+                                                :pretty-print false
+                                                :output-wrapper false
+                                                :closure-warnings {:non-standard-jsdoc :off}}}
                        }
               }
   )

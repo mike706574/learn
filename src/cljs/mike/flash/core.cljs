@@ -1,29 +1,21 @@
 (ns mike.flash.core
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [mike.common.misc :as misc]
-            [mike.common.state :refer [loading! commit! done! error! swap-in! fatal! merge!
-                                       in-order!]]
+            [mike.common.state :refer [loading! commit! done! error! swap-in! fatal! merge! in-order!]]
+            [mike.common.entity :as monkey]
             [mike.common.component :as com]
             [mike.component :as xcom]
             [mike.entity.api :as api]
             [mike.entity.http :refer [HttpEntityRepo]]
-            [cemerick.url :as curl]
             [clojure.string :refer [blank? capitalize]]
             [reagent.core :as reagent]
+            [mike.common.cookies :as cookies]
             [cljs.core.async :refer [<!] :as async]
-            [clojure.walk :refer [keywordize-keys]]))
+))
 
 (enable-console-print!)
 
 (def repo (HttpEntityRepo. "http://localhost:8080/api/" "mike"))
-
-(defn get-url
-  []
-  (curl/url (.-href (.-location js/window))))
-
-(defn get-query-params
-  []
-  (keywordize-keys (:query (get-url))))
 
 (defn load-lessons!
   [state type-id]
@@ -59,9 +51,7 @@
   [state type-id]
   (load-sessions! state type-id)
   (load-lessons! state type-id)
-  (done! state :type-id type-id :type
-
-         ((:types @state) type-id)))
+  (done! state :mode :sessions :type-id type-id :type ((:types @state) type-id)))
 
 (defn load-types!
   [state]
@@ -74,6 +64,14 @@
               (commit! state :types body)
               (load-type! state type-id)))
           (fatal! state message)))))
+
+;; (defn load-initial!
+;;   [state]
+;;   (in-order! state [[:types api/get-types [repo]]
+;;                     [:type-id #(key (first %)) [:types] :no-channel]
+;;                     [:new-entity monkey/get-blank-entity [:type-id] :no-channel]
+;;                     [:new-lesson get-lesson-template [:type] :no-channel]
+;;                     [:lessons api/get-lessons [repo :type-id]]]))
 
 
 (defn create-session!
@@ -120,7 +118,8 @@
   (let [{:keys [type-id types loading-sessions active-sessions
                 completed-sessions loading-lessons lessons]} @state 
         type-options (misc/fmap :label types)]
-    [:div
+    [:div.container-fluid
+     (com/page-header state "Sessions")
      (com/fun-select #(load-type! state (keyword %)) type-options type-id)
      (if loading-lessons
        [:p "Loading lessons..."]
@@ -155,14 +154,28 @@
                                          [:property :correct]
                                          [:property :total]]))])]))
 
+(defn empty-div [state] [:div])
+
+(defn render-entity [state] [:div])
+
 (defn app
-  []
-  (println "Initializing...")
-  (let [state (reagent/atom {:mode :sessions})]
-    (load-types! state)
-    (fn []
-      (println "Rendering...")
-      (com/app state xcom/nav {:session render-session
-                               :sessions render-sessions}))))
+  [username]
+  (println "Initializing...") 
+  (let [logged-in? (cookies/get :logged-in)
+        username (cookies/get :username)]
+    (when (or (not logged-in?) (not username))
+      (misc/redirect! "/login")) 
+    (let [state (reagent/atom {:user username
+                               :mode :initial})] 
+      (load-types! state)
+      (fn []
+        (println "Rendering...")
+        (com/full-app state
+                      :flash
+                      username
+                      {:initial empty-div
+                       :session render-session
+                       :sessions render-sessions
+                       :entity render-entity})))))
 
  (def start (com/boot app "app"))

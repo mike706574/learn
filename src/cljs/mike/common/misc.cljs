@@ -1,8 +1,25 @@
 (ns mike.common.misc
   (:require [clojure.string :refer [blank? capitalize]]
-            [goog.net.cookies :as cookies]))
+            [goog.net.cookies :as cookies]
+            [cemerick.url :as curl]
+            [clojure.walk :refer [keywordize-keys]]))
 
 (enable-console-print!)
+
+(defn redirect!
+  [url]
+  (-> js/document .-location
+      (set! url)))
+
+(defn get-value [e] (-> e .-target .-value))
+
+(defn get-url
+  []
+  (curl/url (.-href (.-location js/window))))
+
+(defn get-query-params
+  []
+  (keywordize-keys (:query (get-url))))
 
 (def third #(nth % 2))
 

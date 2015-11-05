@@ -57,16 +57,22 @@
 (defn snickerdoodle?
   [call]
   (let [thing (second call)]
-    (println "THING:" thing)
-    (println (type thing)) 
-    (println (str (type thing)) )
-    (println (ifn? thing))
     (or (keyword? thing)
         (map? thing)
-        (not (ifn? thing))
+        (not (ifn? thing)))))
 
-
-        )))
+(defn one!
+  [state k f template]
+  (loading! state)
+  (go
+    (let [current-state @state
+          args (map #(resolve-arg current-state %) template)
+          {:keys [status body message]} (<! (apply f args))]
+      (if (misc/ok? status)
+        (if (nil? k)
+          (done! state)
+          (done! state k body))
+        (error! state message)))))
 
 (defn in-order!
   [state calls]
@@ -89,5 +95,7 @@
                                                     {:status :ok :body (apply f args)}
                                                     (<! (apply f args)))))]
             (if (misc/ok? status)
-              (recur (rest remaining-calls) (assoc updated k body) (assoc changes k body))
+              (if (nil? k)
+                (recur (rest remaining-calls) updated changes)
+                (recur (rest remaining-calls) (assoc updated k body) (assoc changes k body)))
               (error! state message)))))))

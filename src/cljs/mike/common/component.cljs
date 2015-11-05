@@ -3,9 +3,51 @@
             [mike.common.state :refer [swap-in! commit!]]
             [mike.common.misc :as misc]
             [mike.common.cookies :as cookies]
-            [clojure.string :refer [blank? capitalize]]))
+            [clojure.string :refer [blank? capitalize join]]))
+
+(defn get-fa-icon
+  [k]
+  (case k
+    :dashboard "fa fa-fw fa-dashboard"
+    :bar-chart-o "fa fa-fw fa-bar-chart-o"
+    :table "fa fa-fw fa-bar-chart-o"
+    :edit "fa fa-fw fa-edit"
+    :desktop "fa fa-fw fa-desktop"
+    :wrench "fa fa-fw fa-wrench"
+    :file "fa fa-fw fa-file"
+    (throw (js/Error. (str "Invalid FA icon: " k)))))
+
+(defn side-navbar
+  [links current]
+  [:ul.nav.navbar-nav.side-nav
+   (map (fn [[k label path icon]]
+          (let [link-class (when (= k current) "active")
+                icon-class (get-fa-icon icon)]
+            [:li {:key k :class link-class}
+             [:a {:href path}
+              [:i {:class icon-class}]
+              [:span (str " " label)]]])) links)])
+
+(def app-navbar
+  (partial
+   side-navbar
+   [[:flash "Flash" "/flash" :dashboard]
+    [:lesson "Lesson" "/lesson" :wrench]
+    [:browse "Browse" "/browse" :desktop]
+    [:types "Types" "/types" :file]]))
 
 ;; TODO: where do i belong?
+(defn page-header
+  [state title]
+  (let [{:keys [error message]} @state]
+   [:div.row
+    [:div.col-lg-12
+     [:h1.page-header title]
+     (when message
+       (if error
+         [:div.alert.alert-danger.close [:strong message]]
+         [:div.alert.alert-info.close [:strong message]]))]]))
+
 (defn get-value [e] (-> e .-target .-value))
             
 (defn- build-option
@@ -96,15 +138,6 @@
             args (map #(if (keyword? %) (% row) %) template)]
         #(apply f args)))))
 
-(defn build-property
-  [row column]
-  (let [k (second column)
-        label (or (misc/third column) )]
-
-    )
-  
-  )
-
 (defn labelize [k] (str (capitalize (name k))))
 
 (defn build-th
@@ -139,16 +172,43 @@
       [:tr {:key (:id row)}
        (for [col cols] (build-td row col))])]])
 
+
+
+(defn in-range?
+  [range value]
+  (and (>= value (first range)) (<= value (second range))))
+
 (defn validate-selection
-  [options value]
-  (or (blank? value) (contains? (misc/maps key options) value)))
+  [{:keys [value options optional?]}]
+  (println value)
+  (if (blank? value)
+    (when (not optional?) "Required!") 
+    (when (not (contains? (misc/maps key options) value))
+      "Not a valid option!")))
+
+(defn validate-number
+  [{:keys [value range]}]
+  (let [[min max] range] 
+    (cond
+      (blank? value) "Required!"
+      (not (misc/is-number? value)) "NaN!"
+      (and min (< (js/parseInt value) min)) "Less than min!"
+      (and max (> (js/parseInt value) max)) "Greater than max!")))
+
+(defn validate-text
+  [{:keys [value optional?]}]
+  (when (and (blank? value) (not optional?)) "Required!"))
 
 (defn validate-property
-  [{:keys [value type required validate options] :as property}]
-  (let [valid? (if (= :select type)
-                 (validate-selection options value)
-                 (validate value))]
-    (assoc property :valid? valid?)))
+  [{:keys [value type required options range] :as property}]
+  (let [validate (case type
+                   :select validate-selection
+                   :number validate-number
+                   :text validate-text
+                   (throw (js/Error. (str "Invalid form input type: " type))))
+        message (validate property)
+        valid? (nil? message)]
+    (assoc property :valid? valid? :message message)))
 
 (defn validate-form
   [properties]
@@ -158,7 +218,7 @@
 
 (defn form
   [state form-key validated-properties]
-  [:form
+  [:form {:role :form}
    (doall
     (for [[k property] validated-properties]
       (let [{:keys [value dirty? valid? type] :or {type :text}} property
@@ -170,14 +230,15 @@
          (label k)
          [:input {:type type :id k :name k :value value :class class
                   :on-change #(swap-in! state [form-key k] assoc :dirty? true
-                                                                 :value (get-value %))}]])))])
+                                                                 :value (get-value %)
+                                                                 )}]])))])
 (defn fun-form
   [state heading form-key submit!]
   (let [data (form-key @state)
         [validated all-valid?] (validate-form data)]
     [:div
      [:h3 heading]
-     [:form
+     [:form {:role :form}
      (doall
       (for [[k property] validated]
         (let [{:keys [value dirty? valid? type] :or {type :text}} property
@@ -189,6 +250,7 @@
            (label k)
            [:input {:type type :id k :name k :value value :class class
                     :on-change #(swap-in! state [form-key k] assoc :dirty? true :value (get-value %))}]])))]
+     
      [:input {:type "button"
               :id :create
               :disabled (not all-valid?) 
@@ -269,15 +331,12 @@
   [state modes]
   (let [{:keys [error loading message mode]} @state]
     (println "Rendering mode:" (name mode))
-    [:div.container-fluid
-     (if (= :fatal mode)
-       (render-fatal message)
-       [:div 
-        (when error [:h3 "Error!"])
-        (when message [:span message])
-        (if-let [f (modes mode)]
-          (f state)
-          (render-fatal "Invalid mode: " (name mode)))])]))
+    (if (= :fatal mode)
+
+      (render-fatal message)
+       (if-let [f (modes mode)]
+         (f state)
+         (render-fatal "Invalid mode: " (name mode))))))
 
 (defn modal
   [state]
@@ -300,7 +359,7 @@
           [:div.progress-bar {:style {"width" "100%"}}]]]]]]]))
 
 (defn full-app
-  [state username modes]
+  [state current username modes]
   [:div#wrapper
    [:nav.navbar.navbar-inverse.navbar-fixed-top
     {:role "navigation"}
@@ -409,104 +468,95 @@
        [:li [:a {:href "#"} [:i.fa.fa-fw.fa-envelope] " Inbox"]]
        [:li [:a {:href "#"} [:i.fa.fa-fw.fa-gear] " Settings"]]
        [:li.divider]
-       [:li [:a {:href "/logout"} [:i.fa.fa-fw.fa-power-off] " Log Out"]]]]]
+       [:li [:a {:href "/logout"} [:i.fa.fa-fw.fa-power-off] " Log Out"]]]]] 
     [:div.collapse.navbar-collapse.navbar-ex1-collapse
-     [:ul.nav.navbar-nav.side-nav
-      [:li
-       [:a
-        {:href "index.html"}
-        [:i.fa.fa-fw.fa-dashboard]
-        " Dashboard"]]
-      [:li
-       [:a
-        {:href "charts.html"}
-        [:i.fa.fa-fw.fa-bar-chart-o]
-        " Charts"]]
-      [:li
-       [:a {:href "tables.html"} [:i.fa.fa-fw.fa-table] " Tables"]]
-      [:li [:a {:href "forms.html"} [:i.fa.fa-fw.fa-edit] " Forms"]]
-      [:li
-       [:a
-        {:href "bootstrap-elements.html"}
-        [:i.fa.fa-fw.fa-desktop]
-        " Bootstrap Elements"]]
-      [:li
-       [:a
-        {:href "bootstrap-grid.html"}
-        [:i.fa.fa-fw.fa-wrench]
-        " Bootstrap Grid"]]
-      [:li
-       [:a
-        {:href "javascript:;",
-         :data-toggle "collapse",
-         :data-target "#demo"}
-        [:i.fa.fa-fw.fa-arrows-v]
-        " Dropdown "
-        [:i.fa.fa-fw.fa-caret-down]]
-       [:ul#demo.collapse
-        [:li [:a {:href "#"} "Dropdown Item"]]
-        [:li [:a {:href "#"} "Dropdown Item"]]]]
-      [:li.active
-       [:a
-        {:href "blank-page.html"}
-        [:i.fa.fa-fw.fa-file]
-        " Blank Page"]]
-      [:li
-       [:a
-        {:href "index-rtl.html"}
-        [:i.fa.fa-fw.fa-dashboard]
-        " RTL Dashboard"]]]]]
+     (app-navbar current)]]
    [:div#page-wrapper
     (sub-app state modes)
     (modal state)]]) 
 
 (defn render-select
-  [state form-key k property]
-  (let [{:keys [value dirty? valid? options]} property
-        invalid? (and dirty? (not valid?))
-        class (if invalid? "form-group has-error" "form-group")
-]
-    (println "OK")
-    (println value)
-    [:div {:key k class class}
-     [:label {:for k} (labelize k)]
-     [:select.form-control {:on-change #(swap-in! state [form-key k] assoc :dirty? true :value (get-value %))
-                            :value value}
-      [:option {:k :none :value nil} "None"]
-      (map build-option options)]]))
+  [state form-key k v {:keys [options optional?]}]
+  [:select.form-control {:on-change #(swap-in! state [form-key k] assoc :dirty? true :value (get-value %))
+                         :value v}
+   (when optional?
+     [:option {:k :none :value ""}])
+   (map build-option options)])
+
+(defn render-text-box
+  [state form-key k v property]
+  [:input.form-control
+   {:id k
+    :name k
+    :value v
+    :type :text
+    :on-change #(swap-in! state [form-key k] merge {:dirty? true
+                                                    :value (get-value %)
+                                                    :last-value v})}])
+
+(defn render-number-box
+  [state form-key k v property]
+  (let [[min max] (:range property)]
+    [:input.form-control
+     {:id k
+      :name k
+      :value v
+      :min min
+      :max max
+      :type :number
+      :on-change #(swap-in! state [form-key k] assoc :dirty? true :value (get-value %))}]))
+
+(defn build-class
+  [coll]
+  (join " " coll))
+
+
+(def clean-group "form-group")
+(def success-group "form-group has-success")
+(def error-group "form-group has-error")
+
+(def success-text-group "form-group has-success has-feedback")
+(def error-text-group "form-group has-error has-feedback")
+
+(def success-glyph "glyphicon glyphicon-ok form-control-feedback")
+(def error-glyph "glyphicon glyphicon-remove form-control-feedback")
 
 (defn form2
-  [state heading label form-key submit!]
+  [state heading submit-label form-key submit!]
   (let [data (form-key @state)
         [validated all-valid?] (validate-form data)]
     [:div
      [:h3 heading]
-     [:form
+     [:form {:role :form}
       (doall
        (for [[k property] validated]
-         (let [{:keys [value dirty? valid? type] :or {type :text}} property]
-           (if (= :select (keyword type))
-             (render-select state form-key  k property)
-             (let [number? (= type :number)
-                   empty-number? (and number? dirty? (blank? value))
-                   invalid? (and dirty? (not valid?))
-                   class (if (or invalid? empty-number?) "form-group has-error" "form-group")] 
-               [:div {:key k :class class}
-                [:label {:for k} (labelize k)]
-                [:input.form-control
-                 {:type type
-                  :id k
-                  :name k
-                  :value value
-                  :class class
-                  :on-change #(swap-in! state [form-key k] assoc :dirty? true :value (get-value %))
+         (let [{:keys [value dirty? valid? type message label] :or {type :text}} property
+               render-input (case type
+                              :select render-select
+                              :text render-text-box
+                              :number render-number-box
+                              (throw (js/Error. (str "Invalid form input type: " type))))
+               has-error? (and dirty? (not valid?))
+               text? (= type :text)
+               group-class (if text?
+                             (if dirty? (if has-error? error-text-group success-text-group) clean-group)
+                             (if dirty? (if has-error? error-group success-group) clean-group))]
 
-                  }]])))))
-      [:button.btn.btn-default {:type "button"
-                                :id :create
-                                :disabled (not all-valid?) 
-                                :value "Add"
-                                :on-click #(submit! state)} label]]]))
+           [:div {:key k :class group-class}
+            [:label {:for k} label]
+            ;; (cond
+            ;;   (not dirty?) [:label {:for k} label]
+            ;;   has-error? [:label {:class "control-label" :for k} (str label " - " message)]
+            ;;   :else [:label {:class "control-label" :for k} (str label)])
+            (render-input state form-key k value property)
+            (when (and text? dirty?) [:span {:class (when dirty? (if has-error? error-glyph success-glyph))
+                                             :aria-hidden true}])])))
+      [:button {:type "button"
+                 :id :submit
+                 :class (if all-valid? "btn btn-default" "btn btn-default disabled")
+                 :disabled (not all-valid?) 
+                 :value "Add"
+                 :on-click #(submit! state)} submit-label]]]))
 
 ;; (defn redirect!
 ;;   [url]

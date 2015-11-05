@@ -5,7 +5,9 @@
             [mike.common.state :refer [loading! commit! done! error! swap-in! in-order!]]
             [mike.common.component :as com]
             [mike.component :as xcom]
+            [mike.common.form :as form]
             [mike.entity.api :as api]
+            [mike.common.entity :as monkey]
             [clojure.string :refer [blank? capitalize]]
             [reagent.core :as reagent]
             [cljs.core.async :refer [<!]]
@@ -13,14 +15,8 @@
 
 (enable-console-print!)
 
-;; TODO: why keep this as state?
 (def repo (HttpEntityRepo. "http://localhost:8080/api/" "mike"))
 
-(defn get-blank-entity
-  [type]
-  (let [attributes (:attributes type)]
-    (misc/mapm (fn [attribute]
-                [(:id attribute) {:value "" :dirty? false :validate misc/not-blank?}]) attributes)))
 
 (defn load-page!
   [state type-id page-number]
@@ -39,7 +35,8 @@
                 end (min entity-count end)
                 {:keys [status body message]} (<! (api/get-entity-range repo type-id start end))]
             (if (misc/ok? status)
-              (done! state :type-id type-id :page-number page-number :entity-count entity-count :entities body)
+              (done! state :type-id type-id :page-number page-number :entity-count entity-count :entities body
+                     :mode :browse)
               (error! state message))))
         (error! state message)))))
 
@@ -49,23 +46,32 @@
   (go
     (let [types (:types @state)
           type (type-id types)
-          new-entity (get-blank-entity type)]
+          new-entity (monkey/get-blank-entity type)]
       (commit! state :type-id type-id :type type :new-entity new-entity )
       (load-page! state type-id 1))))
 
 (defn load-types!
   [state]
-  (loading! state)
+  (println "LOAD TYPES!")
   (go
     (let [{:keys [status body message]} (<! (api/get-types repo))]
       (if (misc/ok? status)
         (let [types body
-              type-id (keyword (:id (val (first types))))]
+              type-id (keyword (:id (val (first types))))
+]
           (if (empty? types)
             (error! state "dude add some types")
             (do (commit! state :types body)
                 (load-type! state type-id)))) 
         (error! state message)))))
+
+(defn load-initial!
+  [state]
+  (in-order! state [[:types api/get-types [repo]]
+                    [:type-id #(key (first %)) [:types] :no-channel]
+                    [:new-entity monkey/get-blank-entity [:type-id] :no-channel]
+                    [:lessons api/get-lessons [repo :type-id]]]))
+
 
 (defn delete-entity!
   [state entity-id]
@@ -92,7 +98,7 @@
           new-entity (misc/fmap :value new-entity)]
       (let [{:keys [status body message]} (<! (api/add-entity! repo type-id new-entity))]
         (if (misc/ok? status)
-          (let [blank-entity (get-blank-entity (type-id types))]
+          (let [blank-entity (monkey/get-blank-entity (type-id types))]
             (commit! state :new-entity blank-entity)
             (load-page! state type-id page-number))
           (error! state message))))))
@@ -120,10 +126,10 @@
         {:keys [label attributes]} (type-id types)
         page-count (get-page-count entity-count page-size)
         type-options (misc/fmap :label types)]
-    (println type-options)
-    [:div
+    [:div.container-fluid
+     (com/page-header state "Browse")
      (com/fun-select #(load-page! state % 1) type-options type-id)
-     (com/fun-form state (str "Add: " label) :new-entity add-entity!)
+     (form/cool state (str "Add: " label) "Add" :new-entity add-entity!)
      [:h2 label]
      (if (= 0 page-count)
        [:p "No entities stored."]
@@ -166,7 +172,7 @@
         {:keys [correct total]} stats
         {:keys [label attributes]} type
         {:keys [id created modified user]} entity]
-    [:div
+    [:div.container-fluid
      (com/button :to-sessions "Back to Browse" #(commit! state :mode :browse))
      [:h2 "Type: " label]
      [:h2 "Entity: " id]
@@ -187,17 +193,43 @@
 
     ))
 
+(defn empty-div [state] [:div])
+
 (defn app
-  []
-  (println "Initializing...")
-  (let [state (reagent/atom {:page-number 1 :page-size 10
-                             :mode :browse
-                             :user (cookies/get :username)
-                             :loading true})]
-    (load-types! state)
-    (fn []
-      (com/app state xcom/nav {:browse render-browse
-                               :lesson render-lessons
-                               :entity render-entity}))))
+  [username]
+  (println "Initializing...") 
+  (let [logged-in? (cookies/get :logged-in)
+        username (cookies/get :username)]
+    (when (or (not logged-in?) (not username))
+      (misc/redirect! "/login")) 
+    (let [state (reagent/atom {:user username
+                               :mode :initial
+                               :page-number 1
+                               :page-size 10
+                               :loading true})] 
+      (load-types! state)
+      (fn []
+        (println "Rendering...")
+        (com/full-app state
+                      username
+                      :browse
+                      {:initial empty-div
+                       :browse render-browse
+                       :lesson render-lessons
+                       :entity render-entity})))))
+
+
+;; (defn app
+;;   []
+;;   (println "Initializing...")
+;;   (let [state (reagent/atom {:page-number 1 :page-size 10
+;;                              :mode :browse
+;;                              :user (cookies/get :username)
+;;                              :loading true})]
+;;     (load-types! state)
+;;     (fn []
+;;       (com/app state xcom/nav {:browse render-browse
+;;                                :lesson render-lessons
+;;                                :entity render-entity}))))
 
  (def start (com/boot app "app"))

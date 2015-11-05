@@ -203,9 +203,11 @@
   (GET "/" [] (home))
   (GET "/types" [] (reagent-dev "Types" "types" "mike.types"))
   (GET "/type" [] (reagent-dev "Type" "type" "mike.types"))
-  (GET "/flash" [] (reagent-dev "Flash" "flash" "mike.flash"))
-  (GET "/browse" [] (reagent-dev "Browse" "browse" "mike.browse"))
-  (GET "/lesson" [] (page "Lesson" "lesson" "mike.lesson"))
+  (GET "/flash" [] (page "Flash" "flash" "mike.flash"))
+  (GET "/browse" [] (page "Browse" "browse" "mike.browse"))
+  (GET "/lesson" []
+       (println "WRAP ACCEPT: " (java.util.Date.))
+       (page "Lesson" "lesson" "mike.lesson"))
 
   (route/not-found not-found-page))
 
@@ -423,6 +425,7 @@
 
 (defn wrap-accept
   [handler]
+  (println "WRAP ACCEPT: " (java.util.Date.))
   (fn [{headers :headers :as request}]
     (let [accept-header (get headers "accept")
           json? (= accept-header "application/json")
