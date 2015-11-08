@@ -4,7 +4,7 @@
             [ring.middleware.params :refer [wrap-params]]
             [ring.middleware.cookies :refer [wrap-cookies]]
             [ring.middleware.defaults :refer [wrap-defaults]]
-            [ring.util.response :refer [redirect]]
+            [ring.util.response :refer [redirect file-response]]
             [hiccup.middleware :refer [wrap-base-url]]
             [hiccup.page :refer [html5 include-css]]
             [hiccup.element :refer [link-to]]
@@ -154,17 +154,7 @@
      :headers {"content-type" content-type}
      :body body})))
 
-(defn home
-  []
-  (html5
-   [:head
-    [:meta {:charset "utf-8"}]
-    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
-    (include-css "css/mike.css")
-    [:title "Home"]]
-   [:body
-    [:p "hi this is mike"]
-    component/nav]))
+y
 
 (defn reagent-dev
   [title filename app]
@@ -200,7 +190,9 @@
 
 ;; TODO: this sucks
 (defroutes site-routes
-  (GET "/" [] (home))
+  (GET "/" []
+       (println "OK")
+       (file-response "index.html" {:root "pages"}))
   (GET "/types" [] (reagent-dev "Types" "types" "mike.types"))
   (GET "/type" [] (reagent-dev "Type" "type" "mike.types"))
   (GET "/flash" [] (page "Flash" "flash" "mike.flash"))
@@ -378,7 +370,7 @@
         (html-routes request))
       (case uri
         "/login" (case request-method
-                   :get {:status 200 :body (login-page "Please login.")}
+                   :get (file-response "login.html")
                    :post (let [username (:username params)]
                            (if (nil? username)
                              (do

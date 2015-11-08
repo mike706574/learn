@@ -2,7 +2,6 @@
   (:refer-clojure :exclude [replace])
   (:require [mike.dynamite :as dyn]
             [mike.entity.api :refer [EntityRepo]]
-            [schema.core :as s]
             [clojure.string :refer [join replace]]
             [clojure.core.async :refer [go]]
             [clojure.java.jdbc :as jdbc]
