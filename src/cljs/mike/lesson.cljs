@@ -112,7 +112,7 @@
 
 (defn render-lesson
   [state]
-  (let [{:keys [lesson entities lesson-id type error message entity-data] :as current-state} @state
+  (let [{:keys [lesson loading-lesson entities lesson-id type error message entity-data] :as current-state} @state
         attributes (:attributes type)
         columns (concat [[:property :id "ID"]]
                         (mapv (fn [attr] [:property (keyword (:id attr))]) attributes)
@@ -126,13 +126,17 @@
       [:span.btn.btn-default {:on-click #(swap! state assoc :mode :lessons)} "Lessons"]
       [:span.btn.btn-primary name]]
      (message-box error message)
-
-     (f/cool state "Add an entity" "Add" :entity-data add-entity!)
+     ;; TODO: make editable
+     [:p "Start:" start]
+     [:p "Name:" length] 
+     (f/cool state "Add an entity" "Add" :entity-data add-entity!) 
      [:h3 "Entities"]
-     ()
-     (if (empty? entities)
-       [:p "No entities."]
-       (t/table entities columns))]))
+     (if loading-lesson
+       (c/loading-header "entities")
+       (if (empty? entities)
+         [:p "No entities."]
+         (t/table entities columns)))]))
+     
 
 (defn render-lessons
   [state]
@@ -160,7 +164,7 @@
                          [:action :delete "Delete" delete-lesson! [state :id]]
                          [:row-action :lesson "View" load-lesson! state]]))]))
 
-;; (defn render-lessons
+;; (defn render-s
 ;;   [state]
 ;;   [:div.col-lg-12
 ;;    [:p "Lorem ipsum dolor sit amet, ipsum conubia nunc amet nisl potenti, semper nulla blandit, dui orci sed penatibus integer donec, mattis urna blandit condimentum in convallis nec. Quisque consequat sagittis posuere integer, vestibulum luctus velit porro urna sit bibendum, maecenas sed donec mauris elit cursus pellentesque. Praesent curabitur et imperdiet praesent ligula pellentesque. Wisi delectus, turpis eget nec posuere aenean enim. Velit mi mi velit velit libero. In laoreet tincidunt et, mauris mauris ut etiam in dignissim, maecenas ante et, vel tristique ut libero, quam a. Magna faucibus quam tortor adipiscing ac, leo ipsum nisl vestibulum, sunt pellentesque ut in nonummy porttitor eu, vel phasellus vel torquent leo gravida quam, a massa orci pede est. Cum nec vel duis in ante, volutpat nullam arcu quam lobortis sed luctus, eget morbi curabitur arcu etiam aliquam nullam, purus fermentum eleifend eu. Ligula tincidunt ante id id a. Lacus qui, dolor integer, neque ad tortor, per phasellus, faucibus sed."]
@@ -177,10 +181,13 @@
 (defn app
   [username]
   (println "Initializing...") 
-  (let [logged-in? (cookies/get :logged-in)
-        username (cookies/get :username)]
-    (when (or (not logged-in?) (not username))
-      (misc/redirect! "/login")) 
+;;   (let [logged-in? (cookies/get :logged-in)
+;;         username (cookies/get :username)]
+;;     (when (or (not logged-in?) (not username))
+;;       (println "REDIRECT")
+;; ;;      (misc/redirect! "/login.html")
+;;       )
+    
     (let [state (r/atom {:user "mike"
                          :mode :lessons})]
       (load-lessons! state)
@@ -189,7 +196,7 @@
         (p/page state {:lessons {:title "Lessons"
                                  :render render-lessons}
                        :lesson {:title ["Lesson: " [:lesson :name]]
-                                :render render-lesson}})))))
+                                :render render-lesson}}))))
 
 (defn ^:export start []
   (println "Starting app...")

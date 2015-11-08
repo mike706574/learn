@@ -5,17 +5,11 @@
 (defn build-action
   [row column]
   (let [f (nth column 3)
-        no-args? (= 4 (count column))]
-    (if no-args?
-      #(f row)
-      (let [template (nth column 4)
-            args (map #(if (keyword? %) (% row) %) template)]
-        #(apply f args)))))
-
-(defn build-row-action
-  [row col]
-  (let [[type k label f state] col]
-    #(f state row)))
+        template (nth column 4)
+        args (if (vector? template)
+               (map #(if (keyword? %) (% row) %) template)
+               (vector template row))]
+    #(apply f args)))
 
 (defn build-td
   [row col]
@@ -24,11 +18,6 @@
     [:td {:key k}
      (case type
        :property (k row)
-       :row-action (let [label (nth col 2)]
-                     [:input.btn.btn-default {:type "button"
-                                              :id k
-                                              :value label
-                                              :on-click (build-row-action row col)}])
        :action (let [label (nth col 2)]
                  [:input.btn.btn-default {:type "button"
                                           :id k
@@ -46,7 +35,6 @@
        :property (if (= (count col) 3)
                    (m/third col)
                    (labelize k))
-       :row-action ""
        :action "")]))
 
 (defn table

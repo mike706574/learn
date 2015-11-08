@@ -19,6 +19,8 @@
                  [compojure "1.3.4"]
                  [hiccup "1.0.5"]
 
+                 [com.cemerick/friend "0.2.2-SNAPSHOT"]
+                 
                  [clj-http "1.1.2"]
                  [com.cemerick/url "0.1.1"]
 

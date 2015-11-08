@@ -20,6 +20,11 @@
   [target]
   [:h4 [:span.fa.fa-refresh.fa-spin.fa-fw.margin-bottom] (str " Loading " target "...")])
 
+;; TODO: find right size or make configurable
+(defn loading-header2
+  [target]
+  [:h5 [:span.fa.fa-refresh.fa-spin.fa-fw.margin-bottom] (str " Loading " target "...")])
+
 (defn loading-alert
   [message]
   [:div.alert.alert-info {:role "alert"}

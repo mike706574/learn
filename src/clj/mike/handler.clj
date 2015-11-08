@@ -4,17 +4,21 @@
             [ring.middleware.params :refer [wrap-params]]
             [ring.middleware.cookies :refer [wrap-cookies]]
             [ring.middleware.defaults :refer [wrap-defaults]]
-            [ring.util.response :refer [redirect file-response]]
+            [cemerick.friend :as friend]
+            [cemerick.friend.credentials :as creds]
+            [cemerick.friend.workflows :as workflows] 
+            [ring.util.response :refer [redirect] :as resp]
             [hiccup.middleware :refer [wrap-base-url]]
-            [hiccup.page :refer [html5 include-css]]
-            [hiccup.element :refer [link-to]]
+            [hiccup.page :as h]
+            [hiccup.element :as e]
             [hiccup.form :refer [radio-button text-field label email-field password-field check-box form-to submit-button]]
             [compojure.handler :as handler]
-            [compojure.route :as route]
+            [compojure.route :as cr]
             [mike.entity.api :as api]
             [mike.entity.jdbc :as what]
             [mike.entity.http :as lol]
             [mike.http :as pete]
+            [mike.auth :as auth]
             [clj-http.client :as http] 
             [clojure.walk :refer [prewalk]] 
             [clojure.data.json :as json]
@@ -27,8 +31,48 @@
   (:import [java.text SimpleDateFormat]
            [mike.entity.jdbc JdbcEntityRepo]
            [mike.entity.http HttpEntityRepo]
+           [java.net URI]
            [java.io StringWriter]
            [java.sql Timestamp]))
+
+(defn resolve-uri
+  [context uri]
+  (let [context (if (instance? URI context) context (URI. context))]
+    (.resolve context uri)))
+
+(defn context-uri
+  "Resolves a [uri] against the :context URI (if found) in the provided
+   Ring request.  (Only useful in conjunction with compojure.core/context.)"
+  [{:keys [context]} uri]
+  (if-let [base (and context (str context "/"))]
+    (str (resolve-uri base uri))
+    uri))
+
+(defn- signup-form
+  [flash]
+  [:div {:class "row"}
+   [:div {:class "columns small-12"}
+    [:h3 "Sign up "
+     [:small "(Any user/pass combination will do, as you are creating a new account or profile.)"]]
+    [:div {:class "row"}
+     [:form {:method "POST" :action "signup" :class "columns small-4"}
+      [:div "Username" [:input {:type "text" :name "username" :required "required"}]]
+      [:div "Password" [:input {:type "password" :name "password" :required "required"}]]
+      [:div "Confirm" [:input {:type "password" :name "confirm" :required "required"}]]
+      [:div "Make you an admin? " [:input {:type "checkbox" :name "admin"}]]
+      [:div
+       [:input {:type "submit" :class "button" :value "Sign up"}]
+       [:span {:style "padding:0 0 0 10px;color:red;"} flash]]]]]])
+
+(def login-form
+  [:div {:class "row"}
+   [:div {:class "columns small-12"}
+    [:h3 "Login"]
+    [:div {:class "row"}
+     [:form {:method "POST" :action "login" :class "columns small-4"}
+      [:div "Username" [:input {:type "text" :name "username"}]]
+      [:div "Password" [:input {:type "password" :name "password"}]]
+      [:div [:input {:type "submit" :class "button" :value "Login"}]]]]]])
 
 (defn sprint [m] 
   (let [w (StringWriter.)]
@@ -63,15 +107,15 @@
 
 ;;(def jello (HttpEntityRepo. "http://localhost:8080/repo/"))
 
-(def not-found-page
-  (html5
-   [:head
-    [:meta {:charset "utf-8"}]
-    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
-    (include-css "css/mike.css")
-    [:title "not found"]]
-   [:body
-    [:p "insert 404 page here"]]))
+;; (def not-found-page
+;;   (html5
+;;    [:head
+;;     [:meta {:charset "utf-8"}]
+;;     [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
+;;     (include-css "css/mike.css")
+;;     [:title "not found"]]
+;;    [:body
+;;     [:p "insert 404 page here"]]))
 
 (defn date-to-string
   [date]
@@ -85,20 +129,24 @@
 
 (def config-file (io/file (io/resource "test_config.edn")))
 
-
 (def config (edn/read-string (slurp config-file)))
 
 (def test-config {:entity-database {:subprotocol "mysql"
                                     :subname "//localhost:3306/entity_dev"
                                     :user "entity"
-                                    :password "entity"}})
+                                    :password "entity"}
+                  :auth-database {:subprotocol "mysql"
+                                  :subname "//localhost:3306/auth_dev"
+                                  :user "auth"
+                                  :password "auth"}})
 
+(def auth-db (:auth-database test-config))
 
 (def db (:entity-database test-config))
 
 (defn page
   [title filename app]
-  (html5
+  (h/html5
    [:head
     [:meta {:charset "utf-8"}]
     [:meta {:http-equiv "X-UA-Compatible", :content "IE=edge"}]
@@ -124,14 +172,14 @@
   [:head
    [:meta {:charset "utf-8"}]
    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
-   (include-css "css/mike.css")
+   (h/include-css "css/mike.css")
    [:link {:type "text/css", :href "/css/mike.css", :rel "stylesheet"}]
    [:title title]]) 
 
 (defn resource-view
   [a]
   (let [{:keys [status message body]} a]
-  (html5
+  (h/html5
    (head "resource")
    [:body
     component/nav
@@ -154,54 +202,18 @@
      :headers {"content-type" content-type}
      :body body})))
 
-y
-
-(defn reagent-dev
-  [title filename app]
-  (html5
-   (head title)
-   [:body
-    [:div#app]
-    [:script {:type "text/javascript" :src (str "/js/" filename "/goog/base.js")}]
-    [:script {:type "text/javascript" :src (str "/js/" filename ".js")}]
-    [:script {:type "text/javascript"} (str "goog.require(\"" app  ".core\");")]
-    [:script {:type "text/javascript"} (str app ".core.start();")]]))
-
-(defn reagent-prod
-  [title app]
-  (html5
-   (head title)
-   [:body
-    [:div#app]
-    [:script {:type "text/javascript" :src (str "/js/" app ".js")}]]))
-
-(defn entity-page
-  [title filename app]
-  (html5
-   (head title)
-   [:body
-    [:div#app]
-    [:script {:type "text/javascript" :src (str "/js/" filename "/goog/base.js")}]
-    [:script {:type "text/javascript" :src (str "/js/" filename ".js")}]
-    [:script {:type "text/javascript"} (str "goog.require(\"" app  ".core\");")]
-    [:script {:type "text/javascript"} (str app ".core.start();")]]))
-
 (defn repo [db user] (JdbcEntityRepo. db user))
 
 ;; TODO: this sucks
-(defroutes site-routes
-  (GET "/" []
-       (println "OK")
-       (file-response "index.html" {:root "pages"}))
-  (GET "/types" [] (reagent-dev "Types" "types" "mike.types"))
-  (GET "/type" [] (reagent-dev "Type" "type" "mike.types"))
-  (GET "/flash" [] (page "Flash" "flash" "mike.flash"))
-  (GET "/browse" [] (page "Browse" "browse" "mike.browse"))
-  (GET "/lesson" []
-       (println "WRAP ACCEPT: " (java.util.Date.))
-       (page "Lesson" "lesson" "mike.lesson"))
+;; (defroutes site-routes
+;;   (GET "/" []
+;;        (println "OK")
+;;        (file-response "index.html" {:root "pages"}))
+;;   (GET "/lesson" []
+;;        (println "WRAP ACCEPT: " (java.util.Date.))
+;;        (page "Lesson" "lesson" "mike.lesson"))
 
-  (route/not-found not-found-page))
+;;   (cr/not-found "404"))
 
 ;; TODO: validate things
 (defroutes api-routes
@@ -244,7 +256,6 @@ y
   (POST "/api/type/:type-id/entity"
         {{type-id :type-id} :params body :body user :user accept :accept}
         (to-response (api/add-entity! (repo db user) type-id body) accept))
-
   
   (GET "/api/type/:type-id/entities"
        {{:keys [type-id n start end tag]} :params user :user accept :accept}
@@ -263,6 +274,7 @@ y
   ;; LESSONS
   (GET "/api/type/:type-id/lesson/:lesson-id"
        {{:keys [type-id lesson-id]} :params user :user accept :accept}
+       (Thread/sleep 2000)
        (to-response (api/get-lesson (repo db user) type-id (parse-int lesson-id)) accept))
 
   (GET "/api/type/:type-id/lesson/:lesson-id/info"
@@ -323,97 +335,112 @@ y
         (api/get-stats-for-user (repo db user) type-id entity-id other-user)
         accept))
   
+  
   ;; TODO: think about this
-  (route/not-found {:status 200
-                    :headers {"Content-Type" "application/json"}
-                    :body (json/write-str {:message "NOT FOUND"})}))
+  (cr/not-found {:status 200
+                 :headers {"Content-Type" "application/json"}
+                 :body (json/write-str {:message "NOT FOUND"})}))
 
-(defn init [] (println "mike is starting"))
-(defn destroy [] (println "mike is shutting down"))
+(defn flash-redirect
+  [request message]
+  (assoc (resp/redirect (str (:context request) "/")) :flash message))
 
-(def html-routes
-  (routes
-   (route/resources "/")
-   site-routes
-   (route/not-found not-found-page)))
+(defroutes site-routes
+  (cr/resources "/")
+  
+  (GET "/" req
+    (h/html5
+     [:head]
+     [:body
+      [:h2 "Sign up and authenticated redirect"]
+      [:p "This app demonstrates form-based sign-up and redirect to an authenticated space."]
+      [:h3 "Current Status " [:small "(this will change when you log in/out)"]]
+      [:p (if-let [identity (friend/identity req)]
+            (apply str "Logged in, with these roles: "
+               (-> identity friend/current-authentication :roles pr-str))
+            "anonymous user")]
+      (signup-form (:flash req))
+      [:h3 "Authorization demos"]
+      [:p "Each of these links require particular roles (or, any authentication) to access. "
+       "If you're not authenticated, you will be redirected to a dedicated login page. "
+       "If you're already authenticated, but do not meet the authorization requirements "
+       "(e.g. you don't have the proper role), then you'll get an Unauthorized HTTP response."]
+      [:ul [:li (e/link-to (context-uri req "role-user") "Requires the `user` role")]
+       [:li (e/link-to (context-uri req "role-admin") "Requires the `admin` role")]
+       [:li (e/link-to (context-uri req "requires-authentication")
+                       "Requires any authentication, no specific role requirement")]]
+      [:h3 "Logging out"]
+      [:p (e/link-to (context-uri req "logout") "Click here to log out") "."]]))
+  (GET "/lesson" request
+       (resp/file-response "resources/public/lesson.html"))
+  (GET "/login" req
+       (resp/file-response "resources/public/login.html"))
+  
+  (POST "/signup" {{:keys [username password confirm admin] :as params} :params :as req}
+        (println "USERNAME" username)
+        (cond
+          (blank? username) (flash-redirect req "Username is required!")
+          (blank? password) (flash-redirect req "Password is required!")
+          (not= password confirm) (flash-redirect req "Passwords don't match!")
+          :else (let [{:keys [status body]} (auth/create-user! auth-db username password admin)]
+                  (println "BODY: " body)
+                  (if (= status :ok)
+                    (friend/merge-authentication
+                     (resp/redirect (context-uri req username))
+                     body)
+                    (flash-redirect req body)))))
+  (GET "/logout" req
+       (friend/logout* (resp/redirect (str (:context req) "/")) ))
+  (GET "/requires-authentication" req
+       (friend/authenticated "Thanks for authenticating!"))
+  (GET "/role-user" {username :username :as req}
+       (println "WHOA"        #{::auth/user})
+       (friend/authorize
+        #{::auth/user}
 
-(defn login-page
-  [message]
-  (html5
-   [:head
-    [:meta {:charset "utf-8"}]
-    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
-    (include-css "css/mike.css")
-    [:title "not found"]]
-   [:body
-    [:span message]
-    (form-to
-     ["POST" "/login"]
-     (label "username" "Username: ")
-     (text-field "username")
-     (label "password" "Password: ")
-     (password-field "password")
-     (submit-button "Submit"))]))
+        (h/html5
+         [:head]
+         [:body
+          [:h2 "Hello, " username "!"]])))
+  (GET "/role-admin" req
+       (friend/authorize #{::auth/admin} "You're an admin!"))
+  (GET "/:user" {session :session :as req}
+       (friend/authenticated
+        (let [user (:user (req :params))]
+          (if (= user (:username (friend/current-authentication)))
+            (h/html5
+             [:head]
+             [:body
+              [:h2 (str "Hello, new user " user "!")]
+              [:p "Return to the " (e/link-to (context-uri req "/") "example") 
+               ", or " (e/link-to (context-uri req "logout") "log out") "."]])
+            (resp/redirect (str (:context req) "/"))))))
 
-(defn handle-site
-  [request]
-  (let [{:keys [cookies uri request-method params]} request
-        logged-in? (= "true" (:value (get cookies "logged-in")))]
+  (cr/not-found "404"))
 
-    (println "*** SITE ACCESS ***")
-    (println "Cookies: " cookies)
-    (println "Logged in? " logged-in?)
-    (if logged-in?
-      (case uri
-        "/login" {:status 400 :body "you're already logged in what are you doing"}
-        "/logout" {:status 302 :headers {"Location" "/login"} :cookies {:logged-in "false"}}
-        (html-routes request))
-      (case uri
-        "/login" (case request-method
-                   :get (file-response "login.html")
-                   :post (let [username (:username params)]
-                           (if (nil? username)
-                             (do
-                               (println "Invalid username: " username)
-                               {:status 400 :body (login-page "Do it right.")})
-                             (do
-                               (println "Logging in:" username)
-                               {:status 303 :headers {"Location" "/"} :cookies {:username username
-                                                                                :logged-in "true"}})))
-                   {:status 404 :body "WHAT?"})
-        "/logout" "you aren't logged in why are you trying to log out?"
-        {:status 303 :headers {"Location" "/login"} :cookies {:logged-in "false"}}))))
-
-(def site-handler
-  (wrap-base-url
-   (handler/site
-    handle-site)))
-
-(defn wrap-api-user
+(defn wrap-user
   [handler]
   (fn [request]
-    (println "*** SITE ACCESS ***")
-    (let [headers (:headers request)
-          user (get headers "lang-user")]
-      (if (nil? user)
-;;        {:status 401 :body "You suck!"}
-        (handler (assoc request :user "guest"))
-        (handler (assoc request :user user))))))
+    (let [{:keys [current authentications]} (get-in request [:session :cemerick.friend/identity])
+          authentication (get authentications current)
+          username (:username authentication)]
+      (handler (assoc request :username username)))))
 
-(def api-handler
-  (wrap-api-user
-   (wrap-json-body
-    (handler/api api-routes)
-    {:keywords? true})))
+(def user-routes
+  (wrap-user site-routes))
 
-(defn main-handler
-  [request]
-  (let [{:keys [headers request-method accept uri method]} request
-        accept (get headers "accept")]
-    (println "***"  request-method uri accept)
-    (if (.startsWith uri "/api")
-      (api-handler request)
-      (site-handler request))))
+(def site-handler
+  (handler/site
+   (friend/authenticate
+    user-routes
+    {:allow-anon? true
+     :login-uri "/login"
+     :default-landing-uri "/"
+     :unauthorized-handler #(-> (h/html5 [:h2 "You do not have sufficient privileges to access " (:uri %)])
+                                resp/response
+                                (resp/status 401))
+     :credential-fn #(creds/bcrypt-credential-fn (partial auth/get-user auth-db) %)
+     :workflows [(workflows/interactive-form)]})))
 
 (defn wrap-accept
   [handler]
@@ -424,4 +451,19 @@ y
           accept (if json? :json :what)]
       (handler (assoc request :accept accept)))))
 
-(def app (wrap-accept main-handler))
+(def api-handler
+  (wrap-accept 
+   (wrap-json-body
+    (handler/api api-routes)
+    {:keywords? true})))
+
+(defn app
+  [{:keys [headers request-method accept uri method] :as request}]
+  ;; TODO: real logging
+  (println "***"  request-method uri accept)
+  (if (.startsWith uri "/api")
+    (api-handler request)
+    (site-handler request)))
+
+(def init #(println "mike is starting"))
+(def destroy #(println "mike is shutting down"))

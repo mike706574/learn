@@ -25,7 +25,7 @@
 
 (defn create-type-table!
   [config]
-  (let [command (str "create table "
+  (let [command (str "create table" 
                      type-table
                      "(id varchar(64) primary key, "
                      "label varchar(64) not null, "
@@ -492,7 +492,6 @@
 
 (deft create-lesson!
   [config type-id user lesson]
-  (println "LEEZZON:" lesson)
   (let [row-count (dyn/count-rows config (lesson-table type-id))
         prepared-lesson (assoc lesson :user user :created nil)
         lesson-id (dyn/insert! config (lesson-table type-id) prepared-lesson)]
@@ -573,7 +572,6 @@
 (deft record-answer!
   [config type-id user session-id entity-id correct?]
   (let [{done? :done session-entity-id :entity-id :as session} (select-session config type-id session-id)]
-    (println entity-id " VS " session-entity-id)
     (cond
       (nil? session) {:status :what :message "TODO: no session"}
       done? {:status :what :message "TODO: already done?"}
@@ -589,7 +587,6 @@
                                           :done done?
                                           :entity_id new-entity-id} ["id = ?" session-id])
               (record-entity-answer! config type-id entity-id user correct?)
-              (println "NEW ENTITY ID:" new-entity-id)
               {:status :ok :body (select-session config type-id session-id)}))))
 
 (deft get-stats
@@ -659,28 +656,3 @@
   (get-entities-for-user [_ type-id other-user] (get-entities-for-user config type-id other-user))
   (get-lessons-for-user [_ type-id other-user] (get-entities-for-user config type-id other-user))
   (get-stats-for-user [_ type-id entity-id other-user] (get-stats config type-id entity-id other-user)))
-
-;; (def user-table "users")
-
-;; (defn create-user-table!
-;;   [config]
-;;   (let [command (str "create table "
-;;                      user-table
-;;                      "(id varchar(32) primary key, "
-;;                      "password varchar(32) not null, "
-;;                      "created timestamp not null default '0000-00-00 00:00:00')"
-;;                      "default character set utf8 collate utf8_unicode_ci")]
-;;     (try
-;;       (jdbc/execute! config [command])
-;;       {:status :ok}
-;;       (catch Exception e {:status :error :exception e}))))
-
-;; (defn create-user!
-;;   [config id password]
-;;   (jdbc/insert! config user-table {:id id :password password})
-;;   {:status :ok})
-
-;; (defn delete-user!
-;;   [config id password]
-;;   (jdbc/delete! config user-table ["id = ?" id]
-;;   {:status :ok}))
