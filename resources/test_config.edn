@@ -1,4 +1,0 @@
-{:entity-database {:subprotocol "mysql"
-                   :subname "//localhost:3306/entity_dev"
-                   :user "entity"
-                   :password "entity"}}

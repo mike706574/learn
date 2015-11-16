@@ -19,6 +19,8 @@
                  [compojure "1.3.4"]
                  [hiccup "1.0.5"]
 
+                 [clj-time "0.11.0"]
+
                  [com.cemerick/friend "0.2.2-SNAPSHOT"]
                  
                  [clj-http "1.1.2"]
@@ -28,27 +30,27 @@
                  [reagent "0.5.1"]
                  [cljs-http "0.1.37"]
 
-                 [figwheel "0.3.7"]
-                 ]
-  :hooks [leiningen.cljsbuild]
+                 [figwheel "0.3.7"]]
+ ;; :hooks [leiningen.cljsbuild]
   :plugins [[lein-ring "0.8.12"]
             [lein-beanstalk "0.2.7"]
             [cider/cider-nrepl "0.9.1"]
-
+            [hiccup-bridge "1.0.1"]
+            
             [lein-cljsbuild "1.0.6"]
             [lein-figwheel "0.3.7"]]
   :ring {:handler mike.handler/app
          :init mike.handler/init
          :destroy mike.handler/destroy}
   :source-paths ["src/clj" "src/cljc"]
+  :test-paths ["test/clj"]
 
   :profiles {:uberjar {:aot :all}
              :production {:ring {:open-browser? false :stacktraces? false :auto-reload? false}
                           :cljsbuild {:builds
                                       {:client {:compiler {:optimizations :advanced
                                                            :elide-asserts true
-                                                           :pretty-print false
-                                                 }}}}}
+                                                           :pretty-print false}}}}}
 
              :lesson {:cljsbuild
                           {:builds
@@ -57,6 +59,14 @@
                                      :compiler {:main "mike.lesson"
                                                 :optimizations :none
                                                 :asset-path "js/client"}}}}}
+             
+             :type {:cljsbuild
+                    {:builds
+                     {:client {:figwheel {:on-jsload "mike.type/start"
+                                          :repl false}
+                               :compiler {:main "mike.type"
+                                          :optimizations :none
+                                          :asset-path "js/client"}}}}}
              
              :browse {:cljsbuild
                           {:builds

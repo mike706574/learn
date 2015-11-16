@@ -6,7 +6,13 @@
             [clojure.core.async :refer [go]]
             [clojure.java.jdbc :as jdbc]
             [clojure.set :refer [rename-keys]]
-            [clojure.walk :refer [keywordize-keys]]))
+            [clojure.walk :refer [keywordize-keys]]
+            [clj-time.core :as time]
+            [clj-time.coerce :as coerce]))
+
+(defn now []
+  (coerce/to-date (time/now)))
+
 
 ;; TODO: find homes
 (defn mapm [f coll] (into {} (map f coll)))
@@ -25,18 +31,16 @@
 
 (defn create-type-table!
   [config]
-  (let [command (str "create table" 
+  (let [command (str "create table "
                      type-table
                      "(id varchar(64) primary key, "
                      "label varchar(64) not null, "
                      "description text not null, "
                      "user varchar(32) not null, "
-                     "created timestamp not null default '0000-00-00 00:00:00')"
+                     "created timestamp not null default '0000-00-00 00:00:00') "
                      "default character set utf8 collate utf8_unicode_ci")]
-    (try
-      (jdbc/execute! config [command])
-      {:status :ok}
-      (catch Exception e {:status :error :exception e}))))
+    (jdbc/execute! config [command])
+    {:status :ok}))
 
 (defn create-attribute-table!
   [config]
@@ -52,9 +56,8 @@
                      type-table
                      "(id) on delete cascade)"
                      "default character set utf8 collate utf8_unicode_ci")]
-    (try
       (jdbc/execute! config [command])
-      {:status :ok})))
+      {:status :ok}))
 
 (defn try-dropping-tables!
   [config tables]
@@ -63,13 +66,13 @@
       (dyn/drop-table! config table)
       (catch Exception e))))
 
-(defn destroy!
+(defn tear-down!
   [config]
   (try-dropping-tables! config [attribute-table type-table]))
 
-(defn create!
+(defn set-up!
   [config]
-  (destroy! config)
+  (tear-down! config)
   (create-type-table! config)
   (create-attribute-table! config))
 
@@ -113,7 +116,7 @@
                      (entity-table type-id)
                      "(id int not null primary key, "
                      "user varchar(32) not null, "
-                     "created timestamp not null default '0000-00-00 00:00:00', "
+                     "created timestamp default 0, "
                      "modified timestamp not null default current_timestamp on update current_timestamp, "
                      (join "," (map build-attribute-sql attribute-specs))
                      ") default character set utf8 collate utf8_unicode_ci")]
@@ -125,7 +128,7 @@
                      (tag-table type-id)
                      "(id int not null, "
                      "tag varchar(64) not null, "
-                     "created timestamp not null default '0000-00-00 00:00:00', "
+                     "created timestamp default 0, "
                      "modified timestamp not null default current_timestamp on update current_timestamp, "
                      "primary key (id, tag), "
                      "foreign key (id) references "
@@ -144,7 +147,7 @@
                      "start varchar(64) null, "
                      "length int not null, "
                      "description varchar(256) not null, "
-                     "created timestamp not null default '0000-00-00 00:00:00', "
+                     "created timestamp default 0, "
                      "modified timestamp not null default current_timestamp on update current_timestamp, "
                      "foreign key (start) references " attribute-table "(id) on delete cascade)" 
                      "default character set utf8 collate utf8_unicode_ci")]
@@ -156,7 +159,7 @@
                      (lesson-entity-table type-id)
                      "(lesson int not null, "
                      "entity int not null, "
-                     "created timestamp not null default '0000-00-00 00:00:00', "
+                     "created timestamp default 0, "
                      "modified timestamp not null default current_timestamp on update current_timestamp, "
                      "primary key (lesson, entity), "
                      "foreign key (lesson) references " (lesson-table type-id) "(id) on delete cascade, "
@@ -173,7 +176,7 @@
                      "start varchar(64) null, "
                      "correct int not null, "
                      "total int not null, "
-                     "created timestamp not null default '0000-00-00 00:00:00', "
+                     "created timestamp default 0, "
                      "modified timestamp not null default current_timestamp on update current_timestamp, "
                      "primary key (id, start, user), "
                      "foreign key (id) references " (entity-table type-id) "(id) on delete cascade, "
@@ -194,7 +197,7 @@
                      "total int not null, "
                      "length int not null, "
                      "done bool not null, "
-                     "created timestamp not null default '0000-00-00 00:00:00', "
+                     "created timestamp default 0, "
                      "modified timestamp not null default current_timestamp on update current_timestamp, "
                      "primary key (id),"
                      "foreign key (lesson_id) references " (lesson-table type-id) "(id) on delete cascade, "
@@ -225,8 +228,8 @@
           type-info (-> type-spec
                         (dissoc :attributes)
                         (assoc :id type-name
-                              :user user
-                               :created nil))]
+                               :user user
+                               :created (now)))]
       (jdbc/insert! conn type-table type-info)
       (doseq [attribute-spec (:attributes type-spec)]
         (let [schema-id (get-sql-type (:schema attribute-spec))
@@ -251,6 +254,7 @@
       (set-up-type! config user type-spec)
       {:status :ok}
       (catch Exception e
+        (println e)
         {:status :error
          :message (str "Failed to create type: " (name (:id type-spec)))
          :exception e}))))
@@ -309,7 +313,7 @@
   (let [table (entity-table type-id)
         row-count (dyn/count-rows config table )
         entity-id (inc row-count)
-        prepared-entity (dissoc (assoc entity :user user :id entity-id :created nil)
+        prepared-entity (dissoc (assoc entity :user user :id entity-id :created (now))
                                 :type-id) 
         result (jdbc/insert! config table prepared-entity)]
     (dyn/get-row-by-id config table :id entity-id)))
@@ -376,7 +380,7 @@
     (if (has-tag? config type-id  entity-id tag)
       {:status :exists}
       (let [table (tag-table type-id)]
-        (jdbc/insert! config table {:id entity-id :tag tag :created nil})
+        (jdbc/insert! config table {:id entity-id :tag tag :created (now)})
         {:status :ok :body {:entity entity :tag tag}}))
     {:status :missing}))
 
@@ -493,13 +497,13 @@
 (deft create-lesson!
   [config type-id user lesson]
   (let [row-count (dyn/count-rows config (lesson-table type-id))
-        prepared-lesson (assoc lesson :user user :created nil)
+        prepared-lesson (assoc lesson :user user :created (now))
         lesson-id (dyn/insert! config (lesson-table type-id) prepared-lesson)]
     {:status :ok :body (select-lesson-info config type-id lesson-id)}))
 
 (deft add-to-lesson!
   [config type-id lesson-id entity-id]
-  (jdbc/insert! config (lesson-entity-table type-id) {:lesson lesson-id :entity entity-id :created nil})
+  (jdbc/insert! config (lesson-entity-table type-id) {:lesson lesson-id :entity entity-id :created (now)})
   {:status :ok})
 
 (deft remove-from-lesson!
@@ -546,7 +550,7 @@
                  :total 0
                  :length (:length info)
                  :done 0
-                 :created nil}
+                 :created (now)}
         session-id (dyn/insert! config (session-table type-id) session)]
     {:status :ok :body (select-session config type-id session-id)}))
 
@@ -558,7 +562,7 @@
         row (first (jdbc/query config [query entity-id user]))]
     (if (nil? row)
       (let [correct (if correct? 1 0)]
-        (jdbc/insert! config table {:id entity-id :user user :correct correct :total 1 :created nil}))
+        (jdbc/insert! config table {:id entity-id :user user :correct correct :total 1 :created (now)}))
       (let [previous (:correct row)
             correct (if correct? (inc previous) previous) 
             total (inc (:total row))] 

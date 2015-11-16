@@ -1,6 +1,7 @@
 (ns mike.form
   (:require [mike.state :refer [swap-in!]]
-            [mike.misc :as misc]
+            [mike.misc :as m]
+            [mike.browser :as b]
             [clojure.string :refer [blank?]]))
 
 ;; TODO: duped
@@ -11,10 +12,9 @@
 
 (defn validate-selection
   [{:keys [value options optional?]}]
-  (println value)
   (if (blank? value)
     (when (not optional?) "Required!") 
-    (when (not (contains? (misc/maps key options) value))
+    (when (not (contains? (m/maps key options) value))
       "Not a valid option!")))
 
 (defn validate-number
@@ -22,7 +22,7 @@
   (let [[min max] range] 
     (cond
       (blank? value) "Required!"
-      (not (misc/is-number? value)) "NaN!"
+      (not (b/is-number? value)) "NaN!"
       (and min (< (js/parseInt value) min)) "Less than min!"
       (and max (> (js/parseInt value) max)) "Greater than max!")))
 
@@ -43,13 +43,13 @@
 
 (defn validate-form
   [properties]
-  (let [validated-properties (misc/fmap validate-property properties)
+  (let [validated-properties (m/fmap validate-property properties)
         all-valid? (every? #(:valid? (val %)) validated-properties)]
     [validated-properties all-valid?])) 
 
 (defn render-select
   [state form-key k v {:keys [options optional?]}]
-  [:select.form-control {:on-change #(swap-in! state [form-key k] assoc :dirty? true :value (misc/get-value %))
+  [:select.form-control {:on-change #(swap-in! state [form-key k] assoc :dirty? true :value (b/get-value %))
                          :value v}
    (when optional?
      [:option {:k :none :value ""}])
@@ -63,7 +63,7 @@
     :value v
     :type :text
     :on-change #(swap-in! state [form-key k] merge {:dirty? true
-                                                    :value (misc/get-value %)
+                                                    :value (b/get-value %)
                                                     :last-value v})}])
 
 (defn render-number-box
@@ -76,7 +76,7 @@
       :min min
       :max max
       :type :number
-      :on-change #(swap-in! state [form-key k] assoc :dirty? true :value (misc/get-value %))}]))
+      :on-change #(swap-in! state [form-key k] assoc :dirty? true :value (b/get-value %))}]))
 
 (def clean-group "form-group")
 (def success-group "form-group has-success")
@@ -92,9 +92,7 @@
   [state heading submit-label form-key submit!]
   (let [data (form-key @state)
         [validated all-valid?] (validate-form data)]
-    (println "FK:" form-key)
     [:div
-     [:h3 heading]
      [:form {:role :form}
       (doall
        (for [[k property] validated]
@@ -111,10 +109,6 @@
                              (if dirty? (if has-error? error-group success-group) clean-group))]
            [:div {:key k :class group-class}
             [:label {:for k} label]
-            ;; (cond
-            ;;   (not dirty?) [:label {:for k} label]
-            ;;   has-error? [:label {:class "control-label" :for k} (str label " - " message)]
-            ;;   :else [:label {:class "control-label" :for k} (str label)])
             (render-input state form-key k value property)
             (when (and text? dirty?) [:span {:class (when dirty? (if has-error? error-glyph success-glyph))
                                              :aria-hidden true}])])))
@@ -122,5 +116,5 @@
                 :id :submit
                 :class (if all-valid? "btn btn-default" "btn btn-default disabled")
                 :disabled (not all-valid?) 
-                 :value "Add"
+                :value "Add"
                 :on-click #(submit! state)} submit-label]]]))

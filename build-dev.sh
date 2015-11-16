@@ -1,3 +1,4 @@
 #!/bin/bash
-rm -rf resources/public/js/$1*
-lein cljsbuild auto $1-dev
+rm -rf resources/public/js/client*
+lein clean
+lein with-profile $1 figwheel

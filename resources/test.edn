@@ -1,0 +1,9 @@
+{:api-url "http://localhost:8080/api/"
+ :entity-database {:subprotocol "mysql"
+                   :subname "//localhost:3306/entity_test"
+                   :user "entity"
+                   :password "entity"}
+ :auth-database {:subprotocol "mysql"
+                 :subname "//localhost:3306/auth_test"
+                 :user "auth"
+                 :password "auth"}}

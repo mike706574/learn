@@ -1,3 +1,4 @@
 #!/bin/bash
-rm -rf resources/public/js/$1*
-lein cljsbuild once $1-prod
+rm -rf resources/public/js/client*
+lein clean
+lein with-profile production compile

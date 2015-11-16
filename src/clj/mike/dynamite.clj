@@ -1,10 +1,9 @@
 (ns mike.dynamite
   (:refer-clojure :exclude [replace])
-  (:require [clojure.java.jdbc :as jdbc]
+  (:require [mike.jaguar :refer [runtime]]
+            [clojure.java.jdbc :as jdbc]
             [clojure.set :refer [union]]
             [clojure.string :refer [join replace]]))
-
-(defn toss [& args] (throw (Exception. (apply str args))))
 
 (defn count-rows
   [config table]
@@ -17,21 +16,6 @@
   (let [query (str "select id from " table " where id = ?")
         results (jdbc/query config [query id])]
     (not (empty? results))))
-
-(defn drop-table!
-  [config table]
-  (jdbc/db-do-commands config (jdbc/drop-table-ddl table)))
-
-(defn drop-tables!
-  [config tables]
-  (doseq [table tables] (drop-table! config table)))
-
-(defn drop-tables-quietly!
-  [config tables]
-  (doseq [table tables]
-    (try
-      (drop-table! config table)
-      (catch Exception e (println "[WARNING] Failed to delete table" table)))))
 
 (defn gen-rand-id
   [row-count]
@@ -52,7 +36,7 @@
 (defn take-unique-random
   [n available]
   (if (> n (count available))
-    (toss (str "Requested " n " unique items, but only " (count available) " available") )
+    (runtime "Requested " n " unique items, but only " (count available) " available")
     (loop [taken #{}]
       (let [left (- n (count taken))]
         (if (= 0 left)
@@ -62,7 +46,7 @@
 (defn gen-unique-rand-ids
   [n row-count]
   (if (> n row-count)
-    (toss (str "Requested " n " unique ids, but only " row-count " available") )
+    (runtime "Requested " n " unique ids, but only " row-count " available")
     (loop [ids #{}]
       (let [left (- n (count ids))]      
         (if (= 0 left)
@@ -163,3 +147,38 @@
 (defn no-row?
   [config table id]
   (nil? (select-by-id config table id)))
+
+;; maintenance
+(defmacro defquiet
+  [fn-symbol args & body]
+  `(def ~fn-symbol
+     (fn ~args
+       (try
+         ~(conj body `do)
+         (catch Exception e#)))))
+
+(defn drop-table!
+  [config table]
+  (jdbc/db-do-commands config (jdbc/drop-table-ddl table)))
+
+(defquiet drop-table-quietly!
+  [config table]
+  (jdbc/db-do-commands config (jdbc/drop-table-ddl table)))
+
+(defn drop-database!
+  [config name]
+  (let [command (str "drop database " name)]
+    (jdbc/execute! config [command])))
+
+(defn create-database!
+  [config name]
+  (let [command (str "create database " name " CHARACTER SET utf8 COLLATE utf8_general_ci")]
+    (jdbc/execute! config [command])))
+
+(defn drop-tables!
+  [config tables]
+  (doseq [table tables] (drop-table! config table)))
+
+(defn drop-tables-quietly!
+  [config tables]
+  (doseq [table tables] (drop-table-quietly! config table)))

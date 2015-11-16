@@ -1,33 +1,23 @@
-7(ns mike.entity.jdbc-test
+(ns mike.entity.jdbc-test
   (:require [mike.entity.api :as api]
-            [mike.entity.jdbc :refer [create! destroy!] :as jdbc]
+            [mike.entity.jdbc :refer [set-up! tear-down!] :as jdbc]
             [mike.dynamite :as dynamite]
+            [mike.config :as c]
+            [mike.misc :refer [fmap]]
             [clojure.core.async :refer [<!!]]
-            [clojure.test :refer :all]
-            [clojure.java.io :as io]
-            [clojure.edn :as edn])
+            [clojure.test :refer :all])
   (:import [mike.entity.jdbc JdbcEntityRepo]))
 
 ;; (clojure.test/test-vars [#'mike.entity.jdbc-test/lessons])
 
 ;; TODO: find me a real home
-(defn fmap
-  [f m]
-  (into (empty m) (for [[k v] m] [k (f v)])))
 
-(def config {:subprotocol "mysql"
-             :subname "//localhost:3306/entity_test"
-             :user "entity"
-             :password "entity"})
+(def entity-db {:subprotocol "mysql"
+                :subname "//localhost:3306/entity_test"
+                :user "entity"
+                :password "entity"})
+(def repo (JdbcEntityRepo. entity-db "mike"))
 
-(def repo (JdbcEntityRepo. config "mike"))
-
-(def dconfig {:subprotocol "mysql"
-             :subname "//localhost:3306/entity_dev"
-             :user "entity"
-             :password "entity"})
-
-(def drepo (JdbcEntityRepo. dconfig "mike"))
 
 (def en-it-type
   {:id :en-it
@@ -57,7 +47,7 @@
 
 (deftest types
   (testing "create, get, and delete a type"
-    (create! config)
+    (set-up! entity-db)
 
     (let [{:keys [status body]} (<!! (api/get-types repo))]
       (is (= :ok status))
@@ -90,7 +80,7 @@
 
     (is (= {:status :ok} (<!! (api/delete-type! repo :en-sp)))) 
     (is (= {:status :ok} (<!! (api/delete-type! repo :en-it)))) 
-    (destroy! config)))
+    (tear-down! entity-db)))
 
 (defn no-dates [body] (dissoc body :created :modified))
 (defn no-meta [body] (dissoc body :created :modified :id))
@@ -99,7 +89,7 @@
 (deftest entities
   (testing "create, get, update, and delete an entity"
     (let [id (atom nil)] 
-      (create! config)
+      (set-up! entity-db)
       (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
 
       (is (= {:status :ok :body 0} (<!! (api/count-entities repo :en-it))))
@@ -132,7 +122,7 @@
       (is (= :empty (:status (<!! (api/get-entity repo :en-it @id)))))
 
       (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))
-      (destroy! config))))
+      (tear-down! entity-db))))
 
 (def test-entities [{:english "one" :italian "uno"}
                     {:english "two" :italian "due"}
@@ -142,7 +132,7 @@
 
 (deftest entity-range
   (testing "get entity range"
-    (create! config)
+    (set-up! entity-db)
     (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
 
     (doseq [entity test-entities]
@@ -153,11 +143,11 @@
       (is (= test-entities (map data-only body))))
     
     (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))
-    (destroy! config)))
+    (tear-down! entity-db)))
 
 (deftest random-entity
   (testing "get random entity"
-    (create! config)
+    (set-up! entity-db)
     (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
 
     (doseq [entity test-entities]
@@ -170,11 +160,11 @@
         (is (contains? (set test-entities) (data-only body)))))
     
     (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))
-    (destroy! config)))
+    (tear-down! entity-db)))
 
 (deftest random-entities
   (testing "get random entities"
-    (create! config)
+    (set-up! entity-db)
     (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
 
     (doseq [entity test-entities]
@@ -187,11 +177,11 @@
           (is (contains? (set test-entities) entity)))))
     
     (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))
-    (destroy! config)))
+    (tear-down! entity-db)))
 
 (deftest tags
   (testing "add, delete, and check tags"
-    (create! config)
+    (set-up! entity-db)
     (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
 
     (is (= :ok (:status (<!! (api/add-entity! repo :en-it {:english "Hello!" :italian "Buongiorno!"})))))
@@ -213,11 +203,11 @@
     (is (= {:status :ok :body []} (<!! (api/get-entity-tags repo :en-it 1))))
     
     (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))
-    (destroy! config)))
+    (tear-down! entity-db)))
 
 (deftest entities-for-user
   (testing "get all entities for user"
-    (create! config)
+    (set-up! entity-db)
     (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
 
     (let [{:keys [status body]} (<!! (api/get-entities-for-user repo :en-it "mike"))]
@@ -233,7 +223,7 @@
       (is (= test-entities (map data-only body))))
         
     (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))
-    (destroy! config))) 
+    (tear-down! entity-db))) 
 
 (def untagged-entities
   [{:english "cat" :italian "gatto"}
@@ -242,7 +232,7 @@
 
 (deftest entities-with-tag
   (testing "get all entities with tag"
-    (create! config)
+    (set-up! entity-db)
     (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
 
     (doseq [entity test-entities]
@@ -269,11 +259,11 @@
           (is (contains? (set test-entities) entity)))))
     
     (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))
-    (destroy! config)))
+    (tear-down! entity-db)))
 
 (deftest tagged-entity-deletion
   (testing "delete a tagged entity"
-    (create! config)
+    (set-up! entity-db)
     (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
 
     (is (= :ok (:status (<!! (api/add-entity! repo :en-it {:english "Hello!" :italian "Buongiorno!"})))))
@@ -285,11 +275,11 @@
     (is (= {:status :ok} (<!! (api/delete-entity! repo :en-it 1))))    
     
     (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))
-    (destroy! config)))
+    (tear-down! entity-db)))
 
 (deftest answers
   (testing "record answers"
-    (create! config)
+    (set-up! entity-db)
     (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
 
     (is (= :ok (:status (<!! (api/add-entity! repo :en-it {:english "Hello!" :italian "Buongiorno!"})))))
@@ -344,7 +334,7 @@
       (is (= {:correct 2 :total 4} body))) 
     
     (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))
-    (destroy! config)))
+    (tear-down! entity-db)))
 
 
 (deftest lessons
@@ -353,7 +343,7 @@
           $lesson-id (atom nil)
           $session-id (atom nil)
           entity {:english "Hello!" :italian "Buongiorno!"} ]
-      (create! config)
+      (set-up! entity-db)
       (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
       
       (let [{:keys [status body]} (<!! (api/add-entity! repo :en-it entity))]
@@ -513,55 +503,4 @@
         (is (= [] body)))
 
       (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))      
-      (destroy! config))))
-
-
-
-
-
-
-
-
-(deftest huh
-  (testing "lessons? what?"
-    (let [$entity-id (atom nil)
-          $lesson-id (atom nil)
-          $session-id (atom nil)
-          entity {:english "Hello!" :italian "Buongiorno!"} ]
-      (create! config)
-      (is (= {:status :ok} (<!! (api/create-type! repo en-it-type))))
-      
-      (let [{:keys [status body]} (<!! (api/add-entity! repo :en-it entity))]
-        (is (= :ok status))
-        (reset! $entity-id (:id body)))
-
-      (let [{:keys [status body]} (<!! (api/get-lessons repo :en-it))]
-        (is (= :ok status))
-        (is (= [] body)))
-      
-      (let [{:keys [status body exception]} (<!! (api/create-lesson! repo :en-it
-                                                                     {:name "Beginner"
-                                                                      :description "A beginner lesson"
-                                                                      :length 3
-                                                                      :start ""}))])
-
-      (is (= {:status :ok} (<!! (api/delete-type! repo :en-it))))      
-      (destroy! config))))
-
-(defn kill-that!
-  [config]
-  (dynamite/drop-tables-quietly! config ["en_it_session"
-                                         "en_it_lesson_entity"
-                                         "en_it_answer"
-                                         "en_it_lesson"
-                                         "en_it_tag"
-                                         "en_it_entity"
-                                         "en_sp_session"
-                                         "en_sp_lesson_entity"
-                                         "en_sp_answer"
-                                         "en_sp_lesson"
-                                         "en_sp_tag"
-                                         "en_sp_entity"])
-  (destroy! config))
-  
-(defn kill! [] (kill-that! config))
+      (tear-down! entity-db))))

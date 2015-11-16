@@ -1,5 +1,6 @@
 (ns mike.page
-  (:require [mike.component :as c]))
+  (:require [mike.component :as c]
+            [mike.state :as s]))
 
 (defn get-fa-icon
   [k]
@@ -66,10 +67,51 @@
   (let [{:keys [loading loading-target message mode] :as current-state} @state
         {:keys [title render]} (get modes mode)
         title (build-title current-state title)]
-    [:div.container-fluid
-     [:div.row
-      [:div.col-lg-12
-       [:h1.page-header title]
-       (when loading (c/loading-header loading-target))]]
-     (when (not loading)
-       [:div.row (render state)])]))
+    (if (= mode :fatal)
+      [:div.container-fluid
+       [:div.row
+        [:div.col-lg-12
+         [:h1.page-header "A fatal error appears!"]
+         [:h5 message]]]]      
+      [:div.container-fluid
+       [:div.row
+        [:div.col-lg-12
+         [:h1.page-header title]
+         (when loading (c/loading-header loading-target))]]
+       (when (not loading)
+         [:div.row (render state)])])))
+
+(defn page2
+  [state title]
+  (let [{:keys [loading loading-target error message mode modes] :as current-state} @state
+        {:keys [title label secondary render]} (get modes mode)]
+    (if (= mode :fatal)
+      [:div.container-fluid
+       [:div.row
+        [:div.col-lg-12
+         [:h1.page-header "A fatal error appears!"]
+         [:h5 message]]]]
+      (if loading
+        [:div.container-fluid
+         [:div.row
+          [:div.col-lg-12
+           [:h1.page-header title]
+           (when loading (c/loading-header loading-target))]]]
+        [:div.container-fluid
+         [:div.row
+          [:div.col-lg-12
+           (if secondary
+             [:h2.page-header label " " [:small secondary]]
+             [:h2.page-header label])
+           [:div.btn-group.btn-breadcrumb
+            (conj
+             (map
+              (fn [[k v]]
+                (if (= k mode) 
+                  [:span.btn.btn-primary {:key k :on-click identity} (:title v)]
+                  [:span.btn.btn-default {:key k :on-click #(s/mode! state k)} (:title v)])) modes)
+             [:a.btn.btn-default {:key "dash" :href "/dashboard"} [:span.glyphicon.glyphicon-home]])]
+           
+           (c/message-box error message)
+           (render state)]]]))))
+

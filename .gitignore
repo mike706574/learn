@@ -10,5 +10,8 @@ pom.xml
 .lein-plugins
 .lein-env
 .nrepl-port
-resources/config.edn
-resources/public/js/
+resources/prod.edn
+resources/public/js/client
+resources/public/js/client*
+resources/mike.pem
+hicv/

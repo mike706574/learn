@@ -1,10 +1,8 @@
-(ns mike.component
-  (:require [mike.misc :as misc]
+(ns mike.component (:require 
+            [mike.browser :as b]
             [clojure.string :refer [blank? capitalize join]]))
 
 (enable-console-print!)
-
-(defn get-value [e] (-> e .-target .-value))
             
 (defn- build-option
   [e]
@@ -13,7 +11,7 @@
 
 (defn fselect
   [f options selected]
-  [:select.form-control {:on-change #(f (get-value %)) :value selected}
+  [:select.form-control {:on-change #(f (b/get-value %)) :value selected}
    (map build-option options)])
 
 (defn loading-header
@@ -38,6 +36,11 @@
    [:span.glyphicon.glyphicon-exclamation-sign {:aria-hidden true}]
    [:span.sr-only "Error!"] " " message])
 
+(defn button
+  [v f]
+  [:input.btn.btn-default {:type "button" :value v
+                           :on-click f}])
+
 (defn success-alert
   [message]
 ;;   <div class="alert alert-warning alert-dismissible" role="alert">
@@ -45,9 +48,18 @@
 ;;   <strong>Warning!</strong> Better check yourself, you're not looking too good.
 ;; </div>
 
-  [:div.alert.alert-success.alert-dismissible {:role "alert" :style {:margin-top "18px"}}
+  [:div.alert.alert-success.alert-dismissible {:role "alert" :style {:marginTop "18px"}}
  ;;  [:button.close {:type "button" :data-dismiss "alert" :aria-label "Close"}]
    [:span.glyphicon.glyphicon-ok {:aria-hidden true}] [:span.sr-only "Success!"] " " message])
+
+(defn message-box
+  ;; TODO: error should be error?, loading should be loading?
+  [error message]
+  (when message
+    (if error
+      (error-alert message)
+      (success-alert message))))
+
 
 
 

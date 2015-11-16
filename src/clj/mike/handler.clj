@@ -1,33 +1,27 @@
 (ns mike.handler
   (:require [compojure.core :refer [routing defroutes routes GET POST DELETE PUT]]
             [ring.middleware.json :refer [wrap-json-body]]
-            [ring.middleware.params :refer [wrap-params]]
-            [ring.middleware.cookies :refer [wrap-cookies]]
-            [ring.middleware.defaults :refer [wrap-defaults]]
             [cemerick.friend :as friend]
             [cemerick.friend.credentials :as creds]
             [cemerick.friend.workflows :as workflows] 
-            [ring.util.response :refer [redirect] :as resp]
+            [ring.util.response :as resp]
             [hiccup.middleware :refer [wrap-base-url]]
             [hiccup.page :as h]
             [hiccup.element :as e]
-            [hiccup.form :refer [radio-button text-field label email-field password-field check-box form-to submit-button]]
             [compojure.handler :as handler]
             [compojure.route :as cr]
             [mike.entity.api :as api]
-            [mike.entity.jdbc :as what]
-            [mike.entity.http :as lol]
-            [mike.http :as pete]
+            [mike.entity.jdbc :as jj]
+            [mike.entity.http]
+            [mike.layout :as l]
             [mike.auth :as auth]
+            [mike.config :as c]
             [clj-http.client :as http] 
             [clojure.walk :refer [prewalk]] 
             [clojure.data.json :as json]
-            [clojure.java.io :as io]
-            [clojure.edn :as edn]
             [clojure.string :refer [blank?]]
             [clojure.core.async :refer [<!!]]
-            [clojure.pprint :refer [pprint]]
-            [mike.component :as component])
+            [clojure.pprint :refer [pprint]])
   (:import [java.text SimpleDateFormat]
            [mike.entity.jdbc JdbcEntityRepo]
            [mike.entity.http HttpEntityRepo]
@@ -48,74 +42,10 @@
     (str (resolve-uri base uri))
     uri))
 
-(defn- signup-form
-  [flash]
-  [:div {:class "row"}
-   [:div {:class "columns small-12"}
-    [:h3 "Sign up "
-     [:small "(Any user/pass combination will do, as you are creating a new account or profile.)"]]
-    [:div {:class "row"}
-     [:form {:method "POST" :action "signup" :class "columns small-4"}
-      [:div "Username" [:input {:type "text" :name "username" :required "required"}]]
-      [:div "Password" [:input {:type "password" :name "password" :required "required"}]]
-      [:div "Confirm" [:input {:type "password" :name "confirm" :required "required"}]]
-      [:div "Make you an admin? " [:input {:type "checkbox" :name "admin"}]]
-      [:div
-       [:input {:type "submit" :class "button" :value "Sign up"}]
-       [:span {:style "padding:0 0 0 10px;color:red;"} flash]]]]]])
-
-(def login-form
-  [:div {:class "row"}
-   [:div {:class "columns small-12"}
-    [:h3 "Login"]
-    [:div {:class "row"}
-     [:form {:method "POST" :action "login" :class "columns small-4"}
-      [:div "Username" [:input {:type "text" :name "username"}]]
-      [:div "Password" [:input {:type "password" :name "password"}]]
-      [:div [:input {:type "submit" :class "button" :value "Login"}]]]]]])
-
 (defn sprint [m] 
   (let [w (StringWriter.)]
     (pprint m w)
     (.toString w)))
-
-(def en-it-type
-  {:id :en-it
-   :label "English/Italian"
-   :description "Bilingual sentence pairs: English and Italian"
-   :attributes [{:id "english"
-                 :label "English"
-                 :schema :str
-                 :description "The sentence in English"}
-                {:id "italian"
-                 :label "Italian"
-                 :schema :str
-                 :description "The sentence in Italian"}]})
-
-(def en-sp-type
-  {:id :en-sp
-   :label "English/Spanish"
-   :description "Bilingual sentence pairs: English and Spanish"
-   :attributes [{:id "english"
-                 :label "English"
-                 :schema :str
-                 :description "The sentence in English"}
-                {:id "spanish"
-                 :label "Spanish"
-                 :schema :str
-                 :description "The sentence in Spanish"}]})
-
-;;(def jello (HttpEntityRepo. "http://localhost:8080/repo/"))
-
-;; (def not-found-page
-;;   (html5
-;;    [:head
-;;     [:meta {:charset "utf-8"}]
-;;     [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
-;;     (include-css "css/mike.css")
-;;     [:title "not found"]]
-;;    [:body
-;;     [:p "insert 404 page here"]]))
 
 (defn date-to-string
   [date]
@@ -127,62 +57,20 @@
 
 (defn parse-int [s] (Integer/parseInt s))
 
-(def config-file (io/file (io/resource "test_config.edn")))
-
-(def config (edn/read-string (slurp config-file)))
-
-(def test-config {:entity-database {:subprotocol "mysql"
-                                    :subname "//localhost:3306/entity_dev"
-                                    :user "entity"
-                                    :password "entity"}
-                  :auth-database {:subprotocol "mysql"
-                                  :subname "//localhost:3306/auth_dev"
-                                  :user "auth"
-                                  :password "auth"}})
-
-(def auth-db (:auth-database test-config))
-
-(def db (:entity-database test-config))
-
-(defn page
-  [title filename app]
-  (h/html5
-   [:head
-    [:meta {:charset "utf-8"}]
-    [:meta {:http-equiv "X-UA-Compatible", :content "IE=edge"}]
-    [:meta
-     {:name "viewport", :content "width=device-width, initial-scale=1"}]
-    [:meta {:name "description", :content ""}]
-    [:meta {:name "author", :content ""}]
-    [:title title]
-    [:link {:href "css/bootstrap.min.css", :rel "stylesheet"}]
-    [:link {:href "css/sb-admin.css", :rel "stylesheet"}]
-    [:link {:href "font-awesome/css/font-awesome.min.css",:rel "stylesheet",:type "text/css"}]]
-   [:body
-    [:div#app]
-    [:script {:type "text/javascript" :src (str "/js/" filename "/goog/base.js")}]
-    [:script {:type "text/javascript" :src (str "/js/" filename ".js")}]
-    [:script {:type "text/javascript"} (str "goog.require(\"" app  ".core\");")]
-    [:script {:type "text/javascript"} (str app ".core.start();")]
-    [:script {:type "text/javascript" :src "js/jquery.js"}]
-    [:script {:type "text/javascript" :src "js/bootstrap.min.js"}]]))
-
-(defn head
-  [title]
-  [:head
-   [:meta {:charset "utf-8"}]
-   [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
-   (h/include-css "css/mike.css")
-   [:link {:type "text/css", :href "/css/mike.css", :rel "stylesheet"}]
-   [:title title]]) 
+(def config (c/load "prod"))
+(def api-url (:api-url config))
+(def auth-db (:auth-database config))
+(def db (:entity-database config))
 
 (defn resource-view
   [a]
   (let [{:keys [status message body]} a]
   (h/html5
-   (head "resource")
+   [:head
+    [:meta {:charset "utf-8"}]
+    [:meta {:name "viewport" :content "initial-scale=1.0,width=device-width"}]
+    [:title "Resource"]]
    [:body
-    component/nav
     [:h3 "status: " status]
     [:h3 "message: "]
     [:pre message]
@@ -192,8 +80,7 @@
 (defn to-response
   [response accept]
   (let [result (<!! response)]
-    (when (:exception result)
-      (println "EXCEPTION: "(:exception result)))    
+    (when (:exception result))    
     (let [content-type (case accept :json "application/json" "text/html")
           body (case accept
                  :json (json/write-str (prewalk convert-if-date (dissoc result :exception)))
@@ -204,22 +91,9 @@
 
 (defn repo [db user] (JdbcEntityRepo. db user))
 
-;; TODO: this sucks
-;; (defroutes site-routes
-;;   (GET "/" []
-;;        (println "OK")
-;;        (file-response "index.html" {:root "pages"}))
-;;   (GET "/lesson" []
-;;        (println "WRAP ACCEPT: " (java.util.Date.))
-;;        (page "Lesson" "lesson" "mike.lesson"))
-
-;;   (cr/not-found "404"))
-
-;; TODO: validate things
 (defroutes api-routes
   (POST "/api/type"
         {body :body user :user accept :accept}
-        (println "BODY:" body)
         (to-response (api/create-type! (repo db user) (assoc body :user user)) accept))
 
   (DELETE "/api/type/:type-id"
@@ -268,7 +142,6 @@
             (if (and start end)
               (api/get-entity-range (repo db user) type-id (parse-int start) (parse-int end))
               (if tag
-                (println "TODO: get entity range for tag")
                 {:status :bad-request :message "BAD COMBINATION"}))) accept)))
 
   ;; LESSONS
@@ -291,7 +164,6 @@
     
   (POST "/api/type/:type-id/lesson"
         {body :body {type-id :type-id} :params user :user accept :accept}
-        (println "BODY:" body)
         (to-response (api/create-lesson! (repo db user) type-id body) accept))
 
   (DELETE "/api/type/:type-id/lesson/:lesson-id"
@@ -334,8 +206,7 @@
        (to-response
         (api/get-stats-for-user (repo db user) type-id entity-id other-user)
         accept))
-  
-  
+
   ;; TODO: think about this
   (cr/not-found {:status 200
                  :headers {"Content-Type" "application/json"}
@@ -349,55 +220,39 @@
   (cr/resources "/")
   
   (GET "/" req
-    (h/html5
-     [:head]
-     [:body
-      [:h2 "Sign up and authenticated redirect"]
-      [:p "This app demonstrates form-based sign-up and redirect to an authenticated space."]
-      [:h3 "Current Status " [:small "(this will change when you log in/out)"]]
-      [:p (if-let [identity (friend/identity req)]
-            (apply str "Logged in, with these roles: "
-               (-> identity friend/current-authentication :roles pr-str))
-            "anonymous user")]
-      (signup-form (:flash req))
-      [:h3 "Authorization demos"]
-      [:p "Each of these links require particular roles (or, any authentication) to access. "
-       "If you're not authenticated, you will be redirected to a dedicated login page. "
-       "If you're already authenticated, but do not meet the authorization requirements "
-       "(e.g. you don't have the proper role), then you'll get an Unauthorized HTTP response."]
-      [:ul [:li (e/link-to (context-uri req "role-user") "Requires the `user` role")]
-       [:li (e/link-to (context-uri req "role-admin") "Requires the `admin` role")]
-       [:li (e/link-to (context-uri req "requires-authentication")
-                       "Requires any authentication, no specific role requirement")]]
-      [:h3 "Logging out"]
-      [:p (e/link-to (context-uri req "logout") "Click here to log out") "."]]))
-  (GET "/lesson" request
-       (resp/file-response "resources/public/lesson.html"))
+       (friend/authenticated
+        (l/dashboard (:username (friend/current-authentication)))))
+  
+  (GET "/lessons" request
+       (friend/authenticated
+        (l/spatula "Lessons" "lesson" api-url (:username (friend/current-authentication)))))
+
+  (GET "/types" request
+       (friend/authenticated
+        (l/spatula "Types" "type" api-url (:username (friend/current-authentication)))))
+  
   (GET "/login" req
-       (resp/file-response "resources/public/login.html"))
+       (l/login))
+  
+  (GET "/signup" req
+       (l/signup))
   
   (POST "/signup" {{:keys [username password confirm admin] :as params} :params :as req}
-        (println "USERNAME" username)
         (cond
           (blank? username) (flash-redirect req "Username is required!")
           (blank? password) (flash-redirect req "Password is required!")
           (not= password confirm) (flash-redirect req "Passwords don't match!")
           :else (let [{:keys [status body]} (auth/create-user! auth-db username password admin)]
-                  (println "BODY: " body)
                   (if (= status :ok)
-                    (friend/merge-authentication
-                     (resp/redirect (context-uri req username))
-                     body)
+                    (friend/merge-authentication (resp/redirect (context-uri req username)) body)
                     (flash-redirect req body)))))
   (GET "/logout" req
-       (friend/logout* (resp/redirect (str (:context req) "/")) ))
+       (friend/logout* (resp/redirect "/login")))
   (GET "/requires-authentication" req
        (friend/authenticated "Thanks for authenticating!"))
   (GET "/role-user" {username :username :as req}
-       (println "WHOA"        #{::auth/user})
        (friend/authorize
-        #{::auth/user}
-
+        #{::auth/user} 
         (h/html5
          [:head]
          [:body
@@ -418,21 +273,10 @@
 
   (cr/not-found "404"))
 
-(defn wrap-user
-  [handler]
-  (fn [request]
-    (let [{:keys [current authentications]} (get-in request [:session :cemerick.friend/identity])
-          authentication (get authentications current)
-          username (:username authentication)]
-      (handler (assoc request :username username)))))
-
-(def user-routes
-  (wrap-user site-routes))
-
 (def site-handler
   (handler/site
    (friend/authenticate
-    user-routes
+    site-routes
     {:allow-anon? true
      :login-uri "/login"
      :default-landing-uri "/"
@@ -442,28 +286,33 @@
      :credential-fn #(creds/bcrypt-credential-fn (partial auth/get-user auth-db) %)
      :workflows [(workflows/interactive-form)]})))
 
-(defn wrap-accept
+(def handle-site (fn [request]
+                   (site-handler request)))
+
+
+(defn wrap-api
   [handler]
-  (println "WRAP ACCEPT: " (java.util.Date.))
   (fn [{headers :headers :as request}]
     (let [accept-header (get headers "accept")
           json? (= accept-header "application/json")
-          accept (if json? :json :what)]
-      (handler (assoc request :accept accept)))))
+          accept (if json? :json nil)
+          user (get headers "lang-user")]
+      (println "API:" user)
+      (handler (assoc request :accept accept :user user)))))
 
 (def api-handler
-  (wrap-accept 
+  (wrap-api
    (wrap-json-body
     (handler/api api-routes)
     {:keywords? true})))
 
 (defn app
   [{:keys [headers request-method accept uri method] :as request}]
-  ;; TODO: real logging
-  (println "***"  request-method uri accept)
+  ;; todo: real logging
+  (println "Request:" request-method uri accept)
   (if (.startsWith uri "/api")
     (api-handler request)
-    (site-handler request)))
+    (handle-site request)))
 
 (def init #(println "mike is starting"))
 (def destroy #(println "mike is shutting down"))

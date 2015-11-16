@@ -3,6 +3,12 @@
   (:require [cljs.core.async :refer [<!]]
             [mike.misc :as m]))
 
+;; generic
+(defn always [v] (fn [& args] v))
+
+(defn ok? [status] (= (keyword status) :ok))
+(def bad? (comp not ok?))
+
 (defn loading!
   [state target]
   (swap! state (comp #(merge % {:error false
@@ -34,9 +40,13 @@
   [state ks f & args]
   (swap! state update-in ks #(apply f (conj args %))))
 
+(defn set-in!
+  [state ks v]
+  (swap! state update-in ks (always v)))
+
 (defn mode!
   [state mode]
-  (swap! state :mode mode))
+  (swap! state assoc :mode mode :message nil))
 
 (defn loading-keyword [k] (keyword (str "loading-" (name k) "?")))
 (defn loading-map [loading? ks] (zipmap (map loading-keyword ks) (repeat loading?)))
@@ -55,7 +65,7 @@
   (loading! state (name k))
   (go (let [args (map #(resolve-arg state %) args)
             {:keys [status body message]} (<! (apply f args))]
-        (if (m/ok? status)
+        (if (ok? status)
           (done! state k body)
           (error! state message)))))
 
@@ -74,7 +84,7 @@
     (let [current-state @state
           args (map #(resolve-arg current-state %) template)
           {:keys [status body message]} (<! (apply f args))]
-      (if (m/ok? status)
+      (if (ok? status)
         (if (nil? k)
           (done! state)
           (done! state k body))
@@ -86,7 +96,7 @@
     (let [current-state @state
           args (map #(resolve-arg current-state %) template)
           {:keys [status body message]} (<! (apply f args))]
-      (if (m/ok? status)
+      (if (ok? status)
         (when (m/not-nil? k)
           (swap! state assoc k body))
         (error! state message)))))
@@ -112,7 +122,7 @@
                                                   (if (and has-4? (= :no-channel (nth call 3))) 
                                                     {:status :ok :body (apply f args)}
                                                     (<! (apply f args)))))]
-            (if (m/ok? status)
+            (if (ok? status)
               (if (nil? k)
                 (recur (rest remaining-calls) updated changes)
                 (recur (rest remaining-calls) (assoc updated k body) (assoc changes k body)))
@@ -122,6 +132,12 @@
 (def Channel :channel)
 (def Value :value)
 (def Merge :merge)
+(def Assert :assert)
+(def SetMode :set-mode)
+(def SpawnMode :spawn-mode)
+(def CreateMode :create-mode)
+(def RemoveMode :delete-mode)
+(def Loading :loading)
 
 (defn batch!
   [state calls]
@@ -133,27 +149,72 @@
         (swap! state merge changes)
         (let [call (first remaining-calls)
               type (first call)
-              params (rest call)]
+              params (rest call)
+              remaining-calls (rest remaining-calls)]
           (case type
             :value (let [[k v] params]
-                     (recur (rest remaining-calls) (assoc updated k v) (assoc changes k v)))
+                     (recur remaining-calls (assoc updated k v) (assoc changes k v)))
 
             :function (let [[k f template] params
                             args (map #(resolve-arg updated %) template)
                             v (apply f args)]
                         (if (nil? k)
-                          (recur (rest remaining-calls) updated changes)
-                          (recur (rest remaining-calls) (assoc updated k v) (assoc changes k v))))
+                          (recur remaining-calls updated changes)
+                          (recur remaining-calls (assoc updated k v) (assoc changes k v))))
+
+            ;; todo: think about this
+            :assert (let [[message f template] params
+                          args (map #(resolve-arg updated %) template)]
+                      (if (apply f args)
+                        (recur remaining-calls updated changes)
+                        (swap! state assoc :mode :fatal :message message)))
 
             :channel (let [[k f template] params
                            args (map #(resolve-arg updated %) template)
                            {:keys [status body message]} (<! (apply f args))]
-                       (if (m/ok? status)
+                       (if (ok? status)
                          (if (nil? k)
-                           (recur (rest remaining-calls) updated changes)
-                           (recur (rest remaining-calls) (assoc updated k body) (assoc changes k body)))
+                           (recur remaining-calls updated changes)
+                           (recur remaining-calls (assoc updated k body) (assoc changes k body)))
                          (error! state message)))
+
+            :set-mode (let [mode (first params)]
+                        (recur remaining-calls
+                               (assoc updated :mode mode :message nil)
+                               (assoc changes :mode mode :message nil)))
+            
+            :create-mode (let [[k title render] params
+                               updated-modes (assoc (:modes updated) k {:title title :render render})] 
+                           (recur remaining-calls
+                                  (assoc updated :modes updated-modes)
+                                  (assoc changes :modes updated-modes)))
+
+            :spawn-mode (let [[k title label render options] params
+                              {:keys [secondary flag]} options
+                               updated-modes (assoc (:modes updated) k {:title title
+                                                                        :label label
+                                                                        :render render
+                                                                        :secondary secondary})
+                               dx {:modes updated-modes :mode k}
+                               dy (if flag (assoc dx flag true) dx)
+                               changes (merge changes dy)]
+                          (swap! state merge changes)
+                          (recur remaining-calls (merge updated dy) changes))
+
+            :remove-mode (let [[k] params
+                               updated-modes (dissoc (:modes updated) k)] 
+                           (recur remaining-calls
+                                  (assoc updated :modes updated-modes)
+                                  (assoc changes :modes updated-modes)))
             
             :merge (let [m (first params)]
-                     (recur (rest remaining-calls) (merge updated m) (merge changes m)))
+                     (recur remaining-calls (merge updated m) (merge changes m)))
+
+            ;; :commit (do (swap! state merge changes)
+            ;;             (recur remaining-calls updated changes))
+            
+            ;; :loading (let [updated (assoc updated :loading true)
+            ;;                changes (assoc changes :loading true)]
+            ;;            (swap! state merge changes)
+            ;;            (recur remaining-calls updated changes))
             ))))))
