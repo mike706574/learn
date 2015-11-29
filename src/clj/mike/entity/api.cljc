@@ -39,13 +39,13 @@
   ;;  (record-lesson-answer! [_ type-id ] "Record an answer for a lesson.")
 
   (create-session! [repo type-id lesson-id] "Start a lesson.")
-  (record-answer! [repo type-id session-id entity-id correct?] "Answer a question for a lesson.")
+  (record-answer! [repo type-id session-id entity-id start correct?] "Answer a question for a lesson.")
   (get-session [repo type-id session-id] "Get a lesson session.")
 
   (get-sessions [repo type-id] "Get all sessions.")
   (get-sessions-for-user [repo type-id user-id] (get-sessions config type-id user))
 
-  (record-individual-answer! [repo type-id entity-id correct?] "Record an answer.")
+  (record-individual-answer! [repo type-id entity-id start correct?] "Record an answer.")
   (get-stats [repo type-id entity-id] "Get stats.")
 
   (get-entities-for-user [repo type-id other-user] "Get entities for a user.")

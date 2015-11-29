@@ -63,8 +63,8 @@
     title))
 
 (defn page
-  [state modes]
-  (let [{:keys [loading loading-target message mode] :as current-state} @state
+  [state modes reload]
+  (let [{:keys [loading loading-target body mode] :as current-state} @state
         {:keys [title render]} (get modes mode)
         title (build-title current-state title)]
     (if (= mode :fatal)
@@ -72,7 +72,10 @@
        [:div.row
         [:div.col-lg-12
          [:h1.page-header "A fatal error appears!"]
-         [:h5 message]]]]      
+         [:h5 body]
+         [:input.btn.btn-default {:type "button"
+                                  :value "Reload"
+                                  :on-click reload}]]]] 
       [:div.container-fluid
        [:div.row
         [:div.col-lg-12
@@ -82,15 +85,18 @@
          [:div.row (render state)])])))
 
 (defn page2
-  [state title]
-  (let [{:keys [loading loading-target error message mode modes] :as current-state} @state
+  [state title reload]
+  (let [{:keys [loading loading-target error body mode modes] :as current-state} @state
         {:keys [title label secondary render]} (get modes mode)]
     (if (= mode :fatal)
       [:div.container-fluid
        [:div.row
         [:div.col-lg-12
          [:h1.page-header "A fatal error appears!"]
-         [:h5 message]]]]
+         [:h5 "Body: " body]
+         [:input.btn.btn-default {:type "button"
+                                  :value "Reload"
+                                  :on-click reload}]]]]
       (if loading
         [:div.container-fluid
          [:div.row
@@ -109,9 +115,9 @@
               (fn [[k v]]
                 (if (= k mode) 
                   [:span.btn.btn-primary {:key k :on-click identity} (:title v)]
-                  [:span.btn.btn-default {:key k :on-click #(s/mode! state k)} (:title v)])) modes)
-             [:a.btn.btn-default {:key "dash" :href "/dashboard"} [:span.glyphicon.glyphicon-home]])]
-           
-           (c/message-box error message)
+                  [:span.btn.btn-default {:key k :on-click
+                                          #(s/mode! state k)} (:title v)])) modes)
+             [:a.btn.btn-default {:key "dashboard" :href "/"} [:span.glyphicon.glyphicon-home]])]
+           (println "BODY:" body)
+           (c/message-box error body)
            (render state)]]]))))
-

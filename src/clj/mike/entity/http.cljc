@@ -2,85 +2,83 @@
   (:refer-clojure :exclude [get])
   #?(:cljs (:require-macros [cljs.core.async.macros :refer [go]]))
   (:require #?(:clj [clojure.core.async :refer [<! <!! go]]
-               :cljs [cljs.core.async :refer [<!]])
+                    :cljs [cljs.core.async :refer [<!]])
             [mike.entity.api :as api :refer [EntityRepo]]
-            [mike.http :as http]
+            [mike.http :refer [fun-client] :as http]
             #?(:clj [clojure.data.json :as json])
-            [clojure.string :refer [join]]
+            [clojure.string :refer [join blank?]]
             [clojure.walk :refer [keywordize-keys]]))
-
-(defn json-body
-  [body]
-  #?(:clj (json/write-str body)
-     :cljs (js/JSON.stringify (clj->js body))))
 
 (defn unkey [x] (if (keyword? x) (name x) x))
 
 (defn build-url [path & parts]
   (str path (join "/" (map unkey parts))))
 
+(defn handle-response
+  [response]
+  (go (let [{:keys [status body]} (<! response)]
+        (case status
+          401 {:status :unauthorized :body "Unauthorized!"}
+          body))))
+
 (defn delete
-  [user url]
-  (go (let [data {:headers {"lang-user" user
-                            "accept" "application/json"}} 
-            {:keys [status body]} (<! (http/delete url data))]
-        (keywordize-keys (http/parse-json body)))))
+  [username password url] 
+  (handle-response (http/delete (fun-client) url {:headers {"accept" "application/json"}
+                                                  :basic-auth [username password]}))) 
 
 (defn post
-  [user url body]
-  (go (let [data {:body (json-body body)
-                  :content-type "application/json"
-                  :headers {"content-type" "application/json"
-                            "lang-user" user
-                            "accept" "application/json"}}
-            {:keys [status body]} (<! (http/post url data))]
-        (keywordize-keys (http/parse-json body)))))
+  [username password url body]
+  (println "IM HERE" username password)
+  (handle-response (http/post (fun-client) url {:body body
+                                                :content-type "application/json"
+                                                :basic-auth [username password]
+                                                :headers {"content-type" "application/json"
+                                                          "accept" "application/json"}})))  
 
 (defn put
-  ([user url]
-   (put user url {}))
-  ([user url body]
-   (go (let [data {:headers {"lang-user" user
-                             "content-type" "application/json"
-                             "accept" "application/json"}
-                   :body (json-body body)}
-            {:keys [status body]} (<! (http/put url data))]
-        (keywordize-keys (http/parse-json body))))))
+  ([username password url]
+   (put username url {}))
+  ([username password url body]
+   (handle-response (http/pet (fun-client) url {:headers {"content-type" "application/json"
+                                                          "accept" "application/json"}
+                                                :basic-auth [username password]
+                                                :body body})))) 
 
 (defn get
-  ([user url]
-   (get user url {}))
-  ([user url query-params]
-   (go
-     (let [{:keys [status body]} (<! (http/get url {:query-params query-params
-                                                    :headers {"lang-user" user
-                                                              "accept" "application/json"}}))]
-       (keywordize-keys (http/parse-json body))))))
+  ([username password url]
+   (get username password url {}))
+  ([username password url query-params]
+   (println "U:" username "P: password")
+   (handle-response (http/get (fun-client) url {:query-params query-params
+                                                :basic-auth [username password]
+                                                :headers {"accept" "application/json"}}))))
 
-(defrecord HttpEntityRepo [path user]
+(defrecord HttpEntityRepo [path user password]
   EntityRepo
-  (create-type! [_ type-spec] (post user (build-url path "type") type-spec))
-  (delete-type! [_ type-id] (delete user (build-url path "type" type-id)))
-  (get-type [_ type-id] (get user (build-url path "type" type-id))) 
-  (get-types [_] (get user (build-url path "types")))
+  (create-type! [_ type-spec] (post user password (build-url path "type") type-spec))
+  (delete-type! [_ type-id] (delete user password (build-url path "type" type-id)))
+  (get-type [_ type-id] (get user password (build-url path "type" type-id))) 
+  (get-types [_]
+    (println "GETTING TYPES " user password )
+    (get user password (build-url path "types")))
 
   (count-entities [_ type-id]
-    (get user (build-url path "type" type-id "entity-count"))) 
+    (get user password (build-url path "type" type-id "entity-count"))) 
   (add-entity! [_ type-id entity]
-    (post user (build-url path "type" type-id "entity") entity))
+    (post user password (build-url path "type" type-id "entity") entity))
   (update-entity! [_ type-id entity-id entity]
     nil) 
   (delete-entity! [_ type-id entity-id]
-    (delete user (build-url path "type" type-id "entity" entity-id)))
+    (delete user password (build-url path "type" type-id "entity" entity-id)))
 
   (get-entity [_ type-id entity-id]
-    (get user (build-url path "type" type-id "entity" entity-id)))
+    (get user password (build-url path "type" type-id "entity" entity-id)))
   (get-random-entity [_ type-id]
-    (get user (build-url path "type" type-id "entity")))
+    (get user password (build-url path "type" type-id "entity")))
   (get-random-entities [_ type-id n]
-    (get user (build-url path "type" type-id "entities") {:n n}))
+    (get user password (build-url path "type" type-id "entities") {:n n}))
   (get-entity-range [_ type-id start end]
-    (get user (build-url path "type" type-id "entities") {:start start :end end}))
+    (get user password (build-url path "type" type-id "entities") {:start start :end end}))
 
   (tag-entity! [_ type-id entity-id tag] nil)
   (untag-entity! [_ type-id entity-id tag] nil)
@@ -92,38 +90,40 @@
   (get-random-entities-with-tag [_ type-id tag n] nil)
 
   (get-lesson [_ type-id lesson-id]
-    (get user (build-url path "type" type-id "lesson" lesson-id)))
+    (get user password (build-url path "type" type-id "lesson" lesson-id)))
   (get-lesson-info [_ type-id lesson-id]
-    (get user (build-url path "type" type-id "lesson" lesson-id "info")))
+    (get user password (build-url path "type" type-id "lesson" lesson-id "info")))
   (get-lesson-entities [_ type-id lesson-id]
-    (get user (build-url path "type" type-id "lesson" lesson-id "entities"))) 
+    (get user password (build-url path "type" type-id "lesson" lesson-id "entities"))) 
   (get-lessons [_ type-id]
-    (get user (build-url path "type" type-id "lessons")))
+    (get user password (build-url path "type" type-id "lessons")))
   (create-lesson! [_ type-id lesson]
-    (post user (build-url path "type" type-id "lesson") lesson))
+    (post user password (build-url path "type" type-id "lesson") lesson))
   (delete-lesson! [config type-id lesson-id]
-    (delete user (build-url path "type" type-id "lesson" lesson-id)))
+    (delete user password (build-url path "type" type-id "lesson" lesson-id)))
   (add-to-lesson! [_ type-id lesson-id entity-id]
-    (put user (build-url path "type" type-id "lesson" lesson-id "entity" entity-id)))
+    (put user password (build-url path "type" type-id "lesson" lesson-id "entity" entity-id)))
   (remove-from-lesson! [_ type-id lesson-id entity-id]
-    (delete user (build-url path "type" type-id "lesson" lesson-id "entity" entity-id)))
+    (delete user password (build-url path "type" type-id "lesson" lesson-id "entity" entity-id)))
   
   (create-session! [_ type-id lesson-id]
-    (post user (build-url path "type" type-id "session") {:lesson-id lesson-id}))
-  (record-answer! [_ type-id session-id entity-id correct?]
-    (put user (build-url path "type" type-id "session" session-id) {:entity-id entity-id :correct correct?}))
+    (post user password (build-url path "type" type-id "session") {:lesson-id lesson-id}))
+  (record-answer! [_ type-id session-id entity-id start correct?]
+    (put user password (build-url path "type" type-id "session" session-id) {:entity-id entity-id
+                                                                    :correct correct?
+                                                                    :start start}))
   (get-session [_ type-id session-id]
-    (get user (build-url path "type" type-id "session" session-id)))
+    (get user password (build-url path "type" type-id "session" session-id)))
 
   (get-sessions [_ type-id] "Get all sessions."
-    (get user (build-url path "type" type-id "sessions")))
+    (get user password (build-url path "type" type-id "sessions")))
   (get-sessions-for-user [_ type-id user-id]
-    (get user (build-url path "type" type-id "sessions") {:user-id user-id}))
+    (get user password (build-url path "type" type-id "sessions") {:user-id user-id}))
   
-  (record-individual-answer! [_ type-id entity-id correct?] nil)
+  (record-individual-answer! [_ type-id entity-id start correct?] nil)
   (get-stats [_ type-id entity-id] nil)
 
   (get-entities-for-user [_ type-id other-user] nil)
   (get-lessons-for-user [_ type-id other-user] nil)
   (get-stats-for-user [_ type-id entity-id user-id]
-    (get user (build-url path "type" type-id "entity" entity-id "stats" user-id))))
+    (get user password (build-url path "type" type-id "entity" entity-id "stats" user-id))))

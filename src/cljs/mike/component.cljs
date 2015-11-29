@@ -1,6 +1,7 @@
-(ns mike.component (:require 
-            [mike.browser :as b]
-            [clojure.string :refer [blank? capitalize join]]))
+(ns mike.component
+  (:require 
+   [mike.browser :as b]
+   [clojure.string :refer [blank? capitalize join]]))
 
 (enable-console-print!)
             
@@ -59,14 +60,3 @@
     (if error
       (error-alert message)
       (success-alert message))))
-
-
-
-
-
-
-
-
-
-
-

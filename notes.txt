@@ -6,15 +6,11 @@ SSL
 
 USEFUL FUNCTIONS;
 clojure.core.select-keys
-
+clojure.core.ex-info, clojure.core.ex-data
 
 USE refer-clojure exclude
 
-
-
 CREATE DATABASE `entity` CHARACTER SET utf8 COLLATE utf8_general_ci;
-
-
 
 ;; BUILDING CLJS
 

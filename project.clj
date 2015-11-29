@@ -8,8 +8,10 @@
 
                  ;; database
                  [mysql/mysql-connector-java "5.1.35"]
-                 [org.clojure/java.jdbc "0.3.7"]
+                 [org.clojure/java.jdbc "0.4.2"]
 
+                 [org.apache.commons/commons-lang3 "3.4"]
+                 
                  ;; webservice
                  [ring "1.4.0"]
                  [ring-server "0.4.0"]
@@ -31,7 +33,7 @@
                  [cljs-http "0.1.37"]
 
                  [figwheel "0.3.7"]]
- ;; :hooks [leiningen.cljsbuild]
+  :hooks [leiningen.cljsbuild]
   :plugins [[lein-ring "0.8.12"]
             [lein-beanstalk "0.2.7"]
             [cider/cider-nrepl "0.9.1"]
@@ -46,37 +48,58 @@
   :test-paths ["test/clj"]
 
   :profiles {:uberjar {:aot :all}
-             :production {:ring {:open-browser? false :stacktraces? false :auto-reload? false}
+             :production {:ring {:open-browser? false
+                                 :stacktraces? false
+                                 :auto-reload? false}
                           :cljsbuild {:builds
                                       {:client {:compiler {:optimizations :advanced
                                                            :elide-asserts true
                                                            :pretty-print false}}}}}
-
+             
              :lesson {:cljsbuild
-                          {:builds
-                           {:client {:figwheel {:on-jsload "mike.lesson/start"
-                                                :repl false}
-                                     :compiler {:main "mike.lesson"
-                                                :optimizations :none
-                                                :asset-path "js/client"}}}}}
+                      {:builds
+                       {:client {:figwheel {:on-jsload "mike.lesson/reload"
+                                            :repl false}
+                                 :compiler {:main "mike.lesson"
+                                            :optimizations :none
+                                            :asset-path "js/client"}}}}}
              
              :type {:cljsbuild
                     {:builds
-                     {:client {:figwheel {:on-jsload "mike.type/start"
+                     {:client {:figwheel {:on-jsload "mike.type/reload"
                                           :repl false}
                                :compiler {:main "mike.type"
                                           :optimizations :none
                                           :asset-path "js/client"}}}}}
+
+             :flash {:cljsbuild
+                     {:builds
+                      {:client {:figwheel {:on-jsload "mike.flash/reload"
+                                           :repl false}
+                                :compiler {:main "mike.flash"
+                                           :optimizations :none
+                                           :asset-path "js/client"}}}}}
+
+             :alligator {:cljsbuild
+                         {:builds
+                          {:client {:figwheel {:on-jsload "mike.alligator/reload"
+                                               :repl false}
+                                    :compiler {:main "mike.alligator"
+                                               :optimizations :none
+                                               :asset-path "js/client"}}}}}
              
              :browse {:cljsbuild
-                          {:builds
-                           {:client {:figwheel {:on-jsload "mike.browse/start"}
-                                     :compiler {:main "mike.browse" :optimizations :none}}}}}
+                      {:builds
+                       {:client {:figwheel {:on-jsload "mike.type/reload"
+                                            :repl false}
+                                 :compiler {:main "mike.type"
+                                            :optimizations :none
+                                            :asset-path "js/client"}}}}}
              }
   
   :figwheel {:repl false}
 
   :cljsbuild {:builds {:client
-                       {:source-paths ["src/cljs"]
+                       {:source-paths ["src/clj" "src/cljs"]
                         :compiler {:output-dir "resources/public/js/client"
                                    :output-to "resources/public/js/client.js"}}}})

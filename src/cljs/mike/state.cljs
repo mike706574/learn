@@ -33,8 +33,8 @@
   (swap! state assoc :loading false :error true :message message))
 
 (defn fatal!
-  [state message]
-  (swap! state assoc :loading false :mode :fatal :message message))
+  [state body]
+  (swap! state assoc :loading false :mode :fatal :body body))
 
 (defn swap-in!
   [state ks f & args]
@@ -46,7 +46,8 @@
 
 (defn mode!
   [state mode]
-  (swap! state assoc :mode mode :message nil))
+  ;; TODO: do i want to do this ALWAYS?
+  (swap! state assoc :mode mode :error false :body nil))
 
 (defn loading-keyword [k] (keyword (str "loading-" (name k) "?")))
 (defn loading-map [loading? ks] (zipmap (map loading-keyword ks) (repeat loading?)))
@@ -138,6 +139,7 @@
 (def CreateMode :create-mode)
 (def RemoveMode :delete-mode)
 (def Loading :loading)
+(def Print :print)
 
 (defn batch!
   [state calls]
@@ -155,6 +157,9 @@
             :value (let [[k v] params]
                      (recur remaining-calls (assoc updated k v) (assoc changes k v)))
 
+            :print (do (println "STATE:" updated)
+                       (recur remaining-calls updated changes))
+
             :function (let [[k f template] params
                             args (map #(resolve-arg updated %) template)
                             v (apply f args)]
@@ -171,12 +176,15 @@
 
             :channel (let [[k f template] params
                            args (map #(resolve-arg updated %) template)
-                           {:keys [status body message]} (<! (apply f args))]
+                           {:keys [status body]} (<! (apply f args))]
                        (if (ok? status)
                          (if (nil? k)
                            (recur remaining-calls updated changes)
-                           (recur remaining-calls (assoc updated k body) (assoc changes k body)))
-                         (error! state message)))
+                           (recur remaining-calls (assoc updated k body) (assoc changes k body))) 
+                         (do (println "Failed to set key:" k)
+                             (println "Status:" status)
+                             (println "Body:" body)
+                             (swap! state assoc :error true :body body))))
 
             :set-mode (let [mode (first params)]
                         (recur remaining-calls

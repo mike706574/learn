@@ -5,7 +5,6 @@
             [mike.component :as c]
             [mike.state :as s]
             [mike.table :as t]
-            [mike.cookies :as cookies]
             [mike.form :as f]
             [mike.entity :as e]
             [mike.entity.api :as api]
@@ -31,7 +30,7 @@
                                                   :type :select
                                                   :optional? true
                                                   :options options})]
-    (m/fmap #(assoc % :dirty? false) with-start)))
+    with-start))
 
 
 (defn build-lesson!
@@ -49,12 +48,8 @@
 
 (defn load-lessons!
   [state]
-  (s/batch! state [[s/Channel :types api/get-types [@repo]]
-                   [s/Assert "No types! Go add some!" #(m/not-empty? %) [:types]]
-                   ;; todo: handle conditional cases?
-                   [s/Value :loading-lessons true]
-                   [s/Function :type-id #(key (first %)) [:types]]
-                   [s/Function :type #(%1 %2) [:type-id :types]]
+  (s/batch! state [[s/Value :loading-lessons true]
+                   [s/Channel :type api/get-type [@repo :type-id]]
                    [s/Function :lesson-data get-lesson-template [:type]]
                    [s/Function :entity-data e/get-blank-entity [:type]]
                    [s/Channel :lessons api/get-lessons [@repo :type-id]]
@@ -80,8 +75,8 @@
 (defn remove-from-lesson!
   [state entity-id]
   (s/batch! state [[s/Value :entity-id entity-id]
-                   [s/Channel nil api/remove-from-lesson! [@repo :type-id :lesson-id :entity-id]]
-                   [s/Channel :lesson api/get-lesson [@repo :type-id :lesson-id]]
+                   [s/Channel nil api/remove-from-lesson! [@repo :type-id [:lesson :id] :entity-id]]
+                   [s/Channel :lesson api/get-lesson [@repo :type-id [:lesson :id]]]
                    [s/Value :message "Removed entity!"]]))
 
 (defn add-entity!
@@ -90,8 +85,8 @@
   ;; TODO: add-to-lesson! should return lesson probably
   (s/batch! state [[s/Function :entity #(m/fmap :value %) [:entity-data]]
                    [s/Channel :created-entity api/add-entity! [@repo :type-id :entity]]
-                   [s/Channel nil api/add-to-lesson! [@repo :type-id :lesson-id [:created-entity :id]]]
-                   [s/Channel :lesson api/get-lesson [@repo :type-id :lesson-id]]
+                   [s/Channel nil api/add-to-lesson! [@repo :type-id [:lesson :id] [:created-entity :id]]]
+                   [s/Channel :lesson api/get-lesson [@repo :type-id [:lesson :id]]]
                    [s/Value :message "Added entity!"]]))
 
 (defn render-lesson
@@ -99,11 +94,10 @@
   (let [{:keys [lesson loading-lesson entities lesson-id lesson-name type error message entity-data] :as current-state} @state
         attributes (:attributes type)
         columns (concat [[:property :id "ID"]]
-                        (mapv (fn [attr] [:property (keyword (:id attr))]) attributes)
+                        (mapv (fn [attr] [:property (keyword (:id attr)) (:label attr)]) attributes)
                         [[:action :delete "Remove" remove-from-lesson! [state :id]]])
         {:keys [name start length entities]} lesson
         start-label (:label (m/find-first #(= start (:id %)) (:attributes type)))]
-    
     [:div {:style {"marginTop" "20px"}}
      (if loading-lesson
        (c/loading-header "lesson")
@@ -122,7 +116,7 @@
         [:h3 "Entities"]
         (if (empty? entities)
           [:p "No entities."]
-          (t/table entities columns))])]))
+          (t/table2 entities columns))])]))
 
 (defn load-lesson!
   [state lesson]
@@ -135,8 +129,8 @@
 
 (defn render-create
   [state]
-  (let [{:keys [error message type-id type types lessons creating-lesson]} @state]
-    [:div {:style {"marginTop" "20px"}} 
+  (let [{:keys [error message type-id type types lessons lesson-data creating-lesson type]} @state]
+    [:div {:style {"marginTop" "20px"}}
      (f/cool state "Create Lesson" "Create" :lesson-data create-lesson!)
      (when creating-lesson
        [:p "Creating lesson..."])]))
@@ -165,17 +159,17 @@
 
 (defn render-home
   [state]
-  (let [{:keys []} @state]
-    [:div
-     [:h3 "What?"]
-     [:p "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed accumsan erat at risus mattis euismod. Morbi at egestas quam. Quisque posuere non arcu tempus vulputate. Nulla sed eleifend urna, eu tempor justo. Fusce et turpis sed massa imperdiet gravida. Vivamus nec placerat arcu. Etiam pharetra a est nec rhoncus. Praesent gravida lorem ut sem ullamcorper venenatis. Duis pulvinar nunc sit amet consequat euismod. Quisque id consequat mi. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Donec eget dictum nunc. Donec tempus sodales nunc, commodo hendrerit nibh tincidunt ac. Aliquam pulvinar in leo et mattis. Proin lacus lectus, tempor et scelerisque sit amet, posuere sed purus. "]]))
+  [:div
+   [:h3 "What?"]
+   [:p "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed accumsan erat at risus mattis euismod. Morbi at egestas quam. Quisque posuere non arcu tempus vulputate. Nulla sed eleifend urna, eu tempor justo. Fusce et turpis sed massa imperdiet gravida. Vivamus nec placerat arcu. Etiam pharetra a est nec rhoncus. Praesent gravida lorem ut sem ullamcorper venenatis. Duis pulvinar nunc sit amet consequat euismod. Quisque id consequat mi. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Donec eget dictum nunc. Donec tempus sodales nunc, commodo hendrerit nibh tincidunt ac. Aliquam pulvinar in leo et mattis. Proin lacus lectus, tempor et scelerisque sit amet, posuere sed purus. "]])
 
 (defn app
-  [api-url username]
-  (println "Initializing... " (str "{:api-url " api-url " :username" username "}"))
-  (reset! repo (HttpEntityRepo. api-url "mike"))
+  [api-url username type-id]
+  (println "Initializing... " (str "{:api-url " api-url " :username" username " :type-id " type-id "}"))
+  (reset! repo (HttpEntityRepo. api-url username "friend"))
   (let [state (r/atom {:user username
                        :mode :home
+                       :type-id (keyword type-id)
                        :modes {:home {:title "Lessons"
                                       :label "Lessons"
                                       :render render-home}
@@ -188,12 +182,12 @@
     (load-lessons! state)
     (fn []
       (println "Rendering mode" (:mode @state) "...")
-      (p/page2 state "Lessons" ))))
+      (p/page2 state "Lessons" identity))))
 
-(defn ^:export start [api-url username]
+(defn ^:export start [api-url username type-id]
   (println "Starting app...")
-  (r/render [(partial app api-url username)] (js/document.getElementById "page-wrapper")))
+  (r/render [(partial app api-url username type-id)] (js/document.getElementById "page-wrapper")))
 
 (defn ^:export reload []
   (println "Reloading app...")
-  (r/render [(partial app "http://localhost:8080/" "mike")] (js/document.getElementById "page-wrapper")))
+  (r/render [(partial app "http://localhost:8080/api/" "mike" nil)] (js/document.getElementById "page-wrapper")))

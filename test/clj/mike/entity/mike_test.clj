@@ -16,16 +16,18 @@
   (t/with-test-out (prn m)))
 
 (defmethod mike-report :pass [m]
-  (t/with-test-out (t/inc-report-counter :pass)))
+  (t/with-test-out
+    (t/inc-report-counter :pass)
+    (println "PASS\n")))
 
 (defmethod mike-report :fail [m]
   (t/with-test-out
     (t/inc-report-counter :fail)
-    (println "\nFAIL in" (t/testing-vars-str m))
+    
+;;    (println "FAIL in" (t/testing-vars-str m))
     (when (seq t/*testing-contexts*) (println (t/testing-contexts-str)))
     (when-let [message (:message m)] (println message))
-    (println "expected:" (pr-str (:expected m)))
-    (println "  actual:" (pr-str (:actual m)))))
+    (println "FAIL" (pr-str (:actual m)) "\n")))
 
 (defmethod mike-report :error [m]
   (t/with-test-out
@@ -48,16 +50,17 @@
 
 (defmethod mike-report :begin-test-ns [m]
   (t/with-test-out
-   (println "\nTesting" (ns-name (:ns m)))))
+   (println "\nSUITE" (ns-name (:ns m)) "\n")))
 
 ;; Ignore these message types:
 (defmethod mike-report :end-test-ns [m])
 (defmethod mike-report :begin-test-var [m])
-(defmethod mike-report :end-test-var [m])
+(defmethod mike-report :end-test-var [m]
+  (println "END"))
 
 (defmacro with-mike
   [& body]
-  `(binding [t/report mike-mike-report]
+  `(binding [t/report mike-report]
      (let [result# (do ~@body)]
        result#)))
  

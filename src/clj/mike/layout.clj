@@ -45,13 +45,20 @@
          [:button.btn.btn-default
           {:type "button"}
           [:i.fa.fa-search]]]]]
-      (map #(side-link current %) [[:dashboard "Dashboard" "/dashboard" "fa-dashboard"]
-                                   [:lessons "Lessons" "/lessons" "fa-table"]
+      (map #(side-link current %) [[:dashboard "Dashboard" "/" "fa-dashboard"]
+                                   [:lessons "Alligator" "/alligator" "fa-table"]
+                                   [:flash "Flashcards" "/flash" "fa-play"]
+                                   [:lessons "Lessons" "/lessons" "fa-table"] 
                                    [:types "Types" "/types" "fa-wrench"]]))]]])
 
 (defn top-right
-  [username]
+  [username current type]
   [:ul.nav.navbar-top-links.navbar-right
+   (when type
+     [:li 
+      [:a {:href "/todo"}
+       [:i.fa.fa-flag.fa-fw]
+       (str " " (:label type) " ")]])
    [:li
     [:a {:href "/todo"}
      [:i.fa.fa-user.fa-fw]
@@ -62,7 +69,7 @@
      " Log Out "]]])
 
 (defn top-bar
-  [username current]
+  [username current type]
   [:nav.navbar.navbar-default.navbar-static-top
    {:role "navigation", :style "margin-bottom: 0"}
    [:div.navbar-header
@@ -74,15 +81,15 @@
      [:span.icon-bar]
      [:span.icon-bar]
      [:span.icon-bar]]
-    [:a.navbar-brand {:href "index.html"} "Kangaroo"]]
-   (top-right username)
+    [:a.navbar-brand {:href "/"} "Kangaroo"]]
+   (top-right username current type)
    (side-bar current)])
 
 (defn dashboard-body
-  [username]
+  [username type]
   [:body
    [:div#wrapper
-    (top-bar username :dashboard)
+    (top-bar username :dashboard type)
     [:div#page-wrapper
      [:div.row
       [:div.col-lg-12 [:h1.page-header "Dashboard"]]] 
@@ -142,32 +149,35 @@
    scripts])
 
 (defn dashboard
-  [username]
+  [username type]
   (p/html5
    (generic-head "Dashboard")
-   (dashboard-body username)))
+   (dashboard-body username type)))
 
 (defn spatula
-  [title namespace api-url username]
+  [title namespace api-url username type]
   (p/html5
-   (generic-head "Lessons")
+   (generic-head title)
    [:body
     [:div#wrapper
-     (top-bar username :lessons)
+     (top-bar username :lessons type)
      [:div#page-wrapper
       [:div#app.container-fluid
        [:div.row
         [:div.col-lg-12
-         [:h1.page-header "Lessons"]
+         [:h1.page-header title]
          [:h4
           [:span.fa.fa-refresh.fa-spin.fa-fw.margin-bottom]
           " Loading page..."]]]]]]
     scripts
     (p/include-js "js/client.js")
-    [:script (str "mike." namespace ".start('" api-url "','" username "');")]]))
+    (println "TYPE:" type)
+    (let [type-id (if type (:id type) "null")]
+      (println "TID:" type-id)
+      [:script (str "mike." namespace ".start('" api-url "','" username "'," type-id ");")])]))
 
 (defn login
-  []
+  [username failed? taken?]
   (p/html5
    (generic-head "Log In")
    [:body
@@ -179,29 +189,96 @@
         [:div.panel-body
          [:form
           {:role "form" :method "POST" :action "login"}
-          [:fieldset
-           [:div.form-group
-            [:input.form-control
-             {:placeholder "Username"
-              :name "username"
-              :type "text"
-              :autofocus "autofocus"}]]
-           [:div.form-group
-            [:input.form-control
-             {:placeholder "Password"
-              :name "password"
-              :type "password"
-              :value ""}]]
-           [:input.btn.btn-lg.btn-success.btn-block
-            {:type "submit" :value "Log in"}]]]
+          (if failed?
+            [:fieldset
+             [:div.form-group.has-error
+              [:input.form-control
+               {:placeholder "Username"
+                :name "username"
+                :type "text"
+                :autofocus "autofocus"}]]
+             [:div.form-group.has-error
+              [:input.form-control
+               {:placeholder "Password"
+                :name "password"
+                :type "password"
+                :value ""
+                :aria-describedby "login-message"}]
+              [:span#login-message.help-block (if taken?
+                                                "Login failed!"
+                                                (str "User " username " does not exist!"))]]
+             [:input.btn.btn-lg.btn-success.btn-block
+              {:type "submit" :value "Log in"}]] 
+            [:fieldset
+             [:div.form-group
+              [:input.form-control
+               {:placeholder "Username"
+                :name "username"
+                :type "text"
+                :autofocus "autofocus"}]]
+             [:div.form-group
+              [:input.form-control
+               {:placeholder "Password"
+                :name "password"
+                :type "password"
+                :value ""}]]
+             [:input.btn.btn-lg.btn-success.btn-block
+              {:type "submit" :value "Log in"}]])]
          [:div
           {:style "padding-top: 15px; font-size: 90%"}
           "Don't have an account? "
           [:a {:href "signup"} "Sign up!"]]]]]]]
     scripts]))
 
+(defn username
+  [errors]
+  (if-let [error (:username errors)] 
+    [:div.form-group.has-error
+     [:input.form-control
+      {:required "required"
+       :placeholder "Username"
+       :name "username"
+       :type "text"
+       :minlength "2"
+       :maxlength "32"
+       :autofocus "autofocus"
+       :aria-describedby "username-message"}]
+     [:span#username-message.help-block (case error
+                                          :missing "Username is required!"
+                                          :taken "Username already taken!")]]
+    [:div.form-group
+     [:input.form-control
+      {:required "required"
+       :placeholder "Username"
+       :name "username"
+       :type "text"
+       :minlength "2"
+       :maxlength "32"
+       :autofocus "autofocus"}]]))
+
+(defn password
+  [errors]
+  (if-let [error (:password errors)]
+    [:div
+     [:div.form-group.has-error
+      [:input.form-control
+       {:required true :placeholder "Password" :name "password" :type "password" :minlength "8" :maxlength "32" :value ""}]]
+     [:div.form-group.has-error
+      [:input.form-control
+       {:required "required" :placeholder "Confirm" :name "confirm" :type "password" :minlength "8" :maxlength "32" :value "" :aria-describedby "password-message"}
+       [:span#password-message.help-block (case error
+                                            :missing "Password is required!"
+                                            :mismatch "Passwords don't match!")]]]] 
+    [:div
+     [:div.form-group
+      [:input.form-control
+       {:required "required" :placeholder "Password" :name "password" :type "password" :minlength "8" :maxlength "32" :value ""}]]
+     [:div.form-group
+      [:input.form-control
+       {:required "required" :placeholder "Confirm" :name "confirm" :type "password" :minlength "8" :maxlength "32" :value ""}]]]))
+
 (defn signup
-  []
+  [errors]
   (p/html5
    (generic-head "Sign Up")
    [:body
@@ -214,33 +291,8 @@
          [:form
           {:role "form" :method "POST" :action "signup"}
           [:fieldset
-           [:div.form-group
-            [:input.form-control
-             {:required "required"
-              :placeholder "Username"
-              :name "username"
-              :type "text"
-              :minlength "2"
-              :maxlength "32"
-              :autofocus "autofocus"}]]
-           [:div.form-group
-            [:input.form-control
-             {:required "required"
-              :placeholder "Password"
-              :name "password"
-              :type "password"
-              :minlength "8"
-              :maxlength "32"
-              :value ""}]]
-           [:div.form-group
-            [:input.form-control
-             {:required "required"
-              :placeholder "Confirm"
-              :name "confirm"
-              :type "password"
-              :minlength "8"
-              :maxlength "32"
-              :value ""}]] 
+           (username errors)
+           (password errors) 
            [:input.btn.btn-lg.btn-success.btn-block
             {:type "submit" :value "Sign up"}]]]
          [:div
@@ -248,3 +300,17 @@
           [:a {:href "login"} "Log in!"]]]]]]]
     scripts]))
 
+(defn missing
+  []
+  (p/html5
+   (generic-head "Not Found")
+   [:body
+    [:div.container
+     [:div.row
+      [:div.col-md-12
+       [:div {:style "padding: 40px 15px; text-align: center;"}
+        [:h1 "What?"]
+        [:p "Something is probably broken."]
+       [:div {:style "margin-top: 15px; margin-bottom: 15px;"}
+        [:a.btn.btn-primary {:href "/" :style "margin-right: 10px;"}
+         [:span.glyphicon.glyphicon-home] " Home"]]]]]]]))

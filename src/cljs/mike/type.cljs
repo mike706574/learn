@@ -3,6 +3,7 @@
   (:require [mike.misc :as m]
             [mike.state :as s]
             [mike.page :as p]
+            [mike.http :refer [fun-client] :as h]
             [mike.table :as t]
             [mike.browser :as b]
             [mike.component :as c]
@@ -26,8 +27,7 @@
    :description {:value "" :label "Description" :type :text}
    :schema {:value "" :label "Schema" :type :select :options schema-options}})
 
-(def type-template {:id {:value "" :label "ID" :type :text}
-                    :label {:value "" :label "Label" :type :text}
+(def type-template {:label {:value "" :label "Label" :type :text}
                     :description {:value "" :label "Description" :type :text}
                     :attributes {:value [] :label "Attributes" :type :list :template attribute-template}})
 ;; end
@@ -38,41 +38,69 @@
   [state type-id]
   (s/batch! state [[s/Channel nil api/delete-type! [@repo type-id]]
                    [s/Channel :types api/get-types [@repo]]
-                   [s/Value :message "Deleted type!"]]))
+                   [s/Merge {:error false
+                             :body "Deleted type!"}]]))
+
+(defn type-panel
+  [state {:keys [id label description attributes]} selectable? deletable?]
+  [:div.panel.panel-default
+   {:key id} 
+   [:div.panel-heading label] 
+   [:div.panel-body
+    [:p description]
+    ;; TODO: replace table with list if it doesn't work well skinny screens
+    (t/table2 attributes [[:property :label "Label"]
+                          [:property :description "Description"]])
+    (when deletable?
+      [:button.btn.btn-danger
+       {:type "button" :on-click #(delete-type! state id)} "Delete"])
+    
+    
+    (when selectable?
+      [:form {:action "/current-type" :method "post"}
+       [:input {:type "hidden" :name "type-id" :value id}]
+       [:input.btn.btn-primary.pull-right {:type "submit"
+                                           :value "Select"}]])]])
 
 (defn render-browse
   [state]
-  (let [{:keys [types error message]} @state]
-    [:div
-     (if (empty? types)
-       [:h4 {:style {:marginTop "15px"}} "No types."]
-       (t/table2 (vals types) [[:property :id "ID"]
-                               [:property :label "Name"]
-                               [:property :description "Description"]
-                               [:property #(count (:attributes %)) "Attributes" ]
-                               [:action :delete "Delete" delete-type! [state :id]]]))]))
-
+  (let [{:keys [types type-id error message]} @state
+        current-type (get types type-id)]
+    (println "TID" type-id)
+    (println "OK" types)
+    (if current-type
+      (let [current-type (get types type-id)
+            other-types (vals (dissoc types type-id))]
+        [:div {:style {"marginTop" "15px"}}
+         [:h4 "Current Type"]
+         [:p "This is the type you currently have selected."]
+         (type-panel state (get types type-id) false false)
+         [:h4 "Other Types"]
+         (if (empty? other-types)
+           [:p "There aren't any other types!"]
+           [:p "These are the other types."])
+         (for [type other-types] (type-panel state type true true))])
+       (if (empty? types)
+         [:div {:style {"marginTop" "15px"}} [:p "There are no types!"]]
+         [:div {:style {"marginTop" "15px"}}
+          (for [type (vals types)] (type-panel state type true true))]))))
+       
 (defn create-type!
   [state]
   (s/batch! state [[s/Channel nil api/create-type! [@repo :new-type]]
-                   [s/Value :message "Created type."]]))
+                   [s/Function :body str ["Created type " [:new-type :label] "!"]]
+                   [s/Merge {:error false
+                             :new-type {}}]
+                   [s/Channel :types api/get-types [@repo]]
+                   [s/SetMode :browse]]))
 
 (defn render-create
   [state]
   (let [{:keys [new-type error message]} @state
         {:keys [id label description attributes]} new-type]
-    [:div
-     [:h3 "Info"]
-     [:form {:role :form}
-      [:div.form-group
-       [:label {:for :id} "Identifier"]
-       [:input.form-control
-        {:type :text
-         :name :id
-         :placeholder "Identifier"
-         :value id
-         :required true
-         :on-change #(s/set-in! state [:new-type :id] (b/get-value %))}]] 
+    [:div {:style {"marginTop" "15px"}} 
+     [:p "Enter this stuff and add some attributes!"]
+     [:form {:role :form}  
       [:div.form-group
        [:label {:for :label} "Label"]
        [:input.form-control
@@ -89,7 +117,6 @@
          :value description
          :required true
          :on-change #(s/set-in! state [:new-type :description] (b/get-value %))}]]
-      [:h3 "Attributes"]
       (if (empty? attributes)
         [:h4 "No attributes."]
         [:div
@@ -100,7 +127,6 @@
                [:div.panel-heading (str "Attribute #" (inc index))]
                [:div.panel-body 
                 [:div.form-group
-                 [:label {:for :label} "Identifier"]
                  [:input.form-control
                   {:type :text
                    :name :id
@@ -122,7 +148,9 @@
                   {:key :schema
                    :id :schema
                    :on-change #(s/set-in! state [:new-type :attributes index :schema] (b/get-value %))}
-                  [:option {:value "str"} "String"]                 [:option {:value "int"} "Integer"]]]
+                  [:option {:value "str"} "String"]
+;;                  [:option {:value "int"} "Integer"]
+                  ]]
                 [:div.form-group
                  [:label {:for :description} "Description"]
                  [:input.form-control
@@ -150,23 +178,27 @@
                                                        (.preventDefault e)
                                                        (create-type! state))}]]]]))
 (defn app
-  [api-url username]
-  (println "Initializing... " (str "{:api-url " api-url " :username" username "}"))
-  (reset! repo (HttpEntityRepo. api-url "mike"))
+  [api-url username type-id]
+  (println "Initializing... " {:api-url api-url :username username :type-id type-id})
+  (reset! repo (HttpEntityRepo. api-url username "friend"))
   (let [state (r/atom {:user username
                        :mode :browse
                        :new-type {}
-                       :modes {:browse {:title "Browse" :label "Browse" :render render-browse}
-                              :create {:title "Create" :label "Create" :render render-create}}})]
-    (s/single! state :types api/get-types [@repo])
+                       :type-id (keyword (str type-id))
+                       :loading true
+                       :modes {:browse {:title "Types" :label "Browse Types" :render render-browse}
+                               :create {:title "Create" :label "Create Type" :render render-create}}})]
+    (s/batch! state [[s/Channel :types api/get-types [@repo]]
+                     [s/Value :loading false]])
     (fn []
       (println "Rendering...")
-      (p/page2 state "Types"))))
+      (p/page2 state "Types" identity))))
 
-(defn ^:export start [api-url username]
+(defn ^:export start [api-url username type-id]
   (println "Starting app...")
-  (r/render [(partial app api-url username)] (js/document.getElementById "page-wrapper")))
+  (println "TYPE ID:" type-id)
+  (r/render [(partial app api-url username type-id)] (js/document.getElementById "page-wrapper")))
 
 (defn ^:export reload []
-  (println "Reloading app...")
-  (r/render [(partial app "http://localhost:8080/" "mike")] (js/document.getElementById "page-wrapper")))
+  (println "Reloading app...") 
+  (r/render [(partial app "http://localhost:8080/api/" "mike" 1)] (js/document.getElementById "page-wrapper")))

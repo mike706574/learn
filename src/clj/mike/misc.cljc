@@ -9,6 +9,11 @@
 (def not-nil? (comp not nil?)) 
 (def not-empty? (comp not empty?))
 
+(defn parse-int
+  [s]
+  #?(:clj (Integer/parseInt s)
+     :cljs (js/parseInt s)))
+
 (defn maps
   [f coll]
   (into #{} (map f coll)))
@@ -16,6 +21,10 @@
 (defn mapm
   [f coll]
   (into {} (map f coll)))
+
+(defn filterm
+  [pred coll]
+  (into {} (filter pred coll)))
 
 (defn find-first
   [f coll]

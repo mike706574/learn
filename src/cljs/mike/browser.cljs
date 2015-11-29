@@ -18,7 +18,7 @@
   []
   (curl/url (.-href (.-location js/window))))
 
-(defn get-query-params
+(defn get-query-paarms
   []
   (keywordize-keys (:query (get-url))))
 

@@ -1,6 +1,6 @@
 (ns mike.entity.jdbc
   (:refer-clojure :exclude [replace])
-  (:require [mike.dynamite :as dyn]
+  (:require [mike.dynamite :as d]
             [mike.entity.api :refer [EntityRepo]]
             [clojure.string :refer [join replace]]
             [clojure.core.async :refer [go]]
@@ -8,11 +8,11 @@
             [clojure.set :refer [rename-keys]]
             [clojure.walk :refer [keywordize-keys]]
             [clj-time.core :as time]
-            [clj-time.coerce :as coerce]))
+            [clj-time.coerce :as coerce])
+  (:import [org.apache.commons.lang3 StringUtils]))
 
 (defn now []
   (coerce/to-date (time/now)))
-
 
 ;; TODO: find homes
 (defn mapm [f coll] (into {} (map f coll)))
@@ -27,17 +27,16 @@
 (def attribute-table "attributes")
 (def type-table "types")
 
-(defn sqlify [x] (replace (name x) #"-" "_"))
-
 (defn create-type-table!
   [config]
   (let [command (str "create table "
                      type-table
-                     "(id varchar(64) primary key, "
+                     "(id int not null auto_increment primary key, "
                      "label varchar(64) not null, "
                      "description text not null, "
                      "user varchar(32) not null, "
-                     "created timestamp not null default '0000-00-00 00:00:00') "
+                     "created timestamp not null default '0000-00-00 00:00:00', "
+                     "unique key user_type (label, user))"
                      "default character set utf8 collate utf8_unicode_ci")]
     (jdbc/execute! config [command])
     {:status :ok}))
@@ -47,7 +46,7 @@
   (let [command (str "create table "
                      attribute-table
                      "(id varchar(64) not null, "
-                     "type varchar(64) not null, "
+                     "type int not null, "
                      "label varchar(64) not null, "
                      "description text not null, "
                      "schema_id varchar(64) not null, "
@@ -63,28 +62,20 @@
   [config tables]
   (doseq [table tables]
     (try
-      (dyn/drop-table! config table)
+      (d/drop-table! config table)
       (catch Exception e))))
 
-(defn tear-down!
-  [config]
-  (try-dropping-tables! config [attribute-table type-table]))
-
-(defn set-up!
-  [config]
-  (tear-down! config)
-  (create-type-table! config)
-  (create-attribute-table! config))
-
 (defn type-exists? [config id]
-  (dyn/id-taken? config type-table (name id)))
+  (d/id-taken? config type-table id))
 
-(defn tag-table [type-id] (str (sqlify type-id) "_tag"))
-(defn lesson-table [type-id] (str (sqlify type-id) "_lesson"))
-(defn lesson-entity-table [type-id] (str (sqlify type-id) "_lesson_entity"))
-(defn entity-table [type-id] (str (sqlify type-id) "_entity"))
-(defn answer-table [type-id] (str (sqlify type-id) "_answer"))
-(defn session-table [type-id] (str (sqlify type-id) "_session"))
+(defn tag-table [type-id] (str type-id "_tag"))
+(defn lesson-table [type-id] (str type-id "_lesson"))
+(defn lesson-entity-table [type-id] (str type-id "_lesson_entity"))
+(defn entity-table [type-id] (str type-id "_entity"))
+(defn answer-table [type-id] (str type-id "_answer"))
+(defn session-table [type-id] (str type-id "_session"))
+
+(defn sqlify [x] (replace (name x) #"-" "_"))
 
 (defn get-sql-type
   [schema]
@@ -101,24 +92,22 @@
     (throw (Exception. (str "Unsupported SQL type: " sql-type)))))
 
 (defn build-attribute-sql
-  [attribute-spec]
-  (let [id (:id attribute-spec)
-        schema (:schema attribute-spec)
-        sql-type (get-sql-type schema)]
-    (str id " " sql-type " not null")))
+  [{:keys [id schema_id]}]
+  (let [name (name id)]
+    (cond
+      (not (StringUtils/isAlphanumeric name)) (throw (RuntimeException. "Attribute IDs must be alphanumeric!"))
+      (not (Character/isLetter (first name))) (throw (RuntimeException. "The first character in an attribute ID must be a letter!"))
+      :else (str "`" name "` " schema_id " not null"))))
 
 (defn create-entity-table!
-  [config type-spec]
-  (let [type-id (:id type-spec)
-        attribute-specs (:attributes type-spec)
-        attribute-ids (map :id attribute-specs)
-        command (str "create table "
+  [config type-id attributes]
+  (let [command (str "create table "
                      (entity-table type-id)
                      "(id int not null primary key, "
                      "user varchar(32) not null, "
                      "created timestamp default 0, "
                      "modified timestamp not null default current_timestamp on update current_timestamp, "
-                     (join "," (map build-attribute-sql attribute-specs))
+                     (join "," (map build-attribute-sql attributes))
                      ") default character set utf8 collate utf8_unicode_ci")]
     (jdbc/execute! config [command])))
 
@@ -144,7 +133,7 @@
                      "(id int not null auto_increment primary key, " 
                      "name varchar(64) not null, "
                      "user varchar(32) not null, "
-                     "start varchar(64) null, "
+                     "start varchar(64), "
                      "length int not null, "
                      "description varchar(256) not null, "
                      "created timestamp default 0, "
@@ -173,7 +162,7 @@
                      (answer-table type-id)
                      "(id int not null, "
                      "user varchar(32) not null, "
-                     "start varchar(64) null, "
+                     "start varchar(64) not null, "
                      "correct int not null, "
                      "total int not null, "
                      "created timestamp default 0, "
@@ -193,7 +182,6 @@
                      "entity_id int not null, "
                      "user varchar(32) not null, "
                      "correct int not null, "
-                     "start varchar(64) null, "
                      "total int not null, "
                      "length int not null, "
                      "done bool not null, "
@@ -201,8 +189,7 @@
                      "modified timestamp not null default current_timestamp on update current_timestamp, "
                      "primary key (id),"
                      "foreign key (lesson_id) references " (lesson-table type-id) "(id) on delete cascade, "
-                     "foreign key (entity_id) references " (entity-table type-id) "(id) on delete cascade, "
-                     "foreign key (start) references " attribute-table "(id) on delete cascade) " 
+                     "foreign key (entity_id) references " (entity-table type-id) "(id) on delete cascade) "
                      "default character set utf8 collate utf8_unicode_ci")]
     (jdbc/execute! config [command])))
 
@@ -213,50 +200,64 @@
        (go
          (try
            (if (nil? (second ~args))
-             {:status :bad-request :message "Type was nil!"}
-             
-             (if (type-exists? (first ~args) (keyword (second ~args)))
+             {:status :bad-request :body "Type was nil!"} 
+             (if (type-exists? (first ~args) (second ~args))
                ~(conj body `do)
-               {:status :missing :message (str "Invalid type ID: " (name (second ~args)))}))
-           (catch Exception e# {:status :error :message (.getMessage e#) :exception e#}))))))
+               {:status :missing :body (str "Invalid type ID: " (second ~args))}))
+           (catch Exception e# {:status :error :body (.getMessage e#) :exception e#}))))))
 
 (defn set-up-type!
   [config user type-spec]
-  (jdbc/with-db-connection [conn config]
-    (let [type-id (:id type-spec)
-          type-name (name type-id)
-          type-info (-> type-spec
+  (jdbc/with-db-transaction [conn config]
+    (let [type-info (-> type-spec
                         (dissoc :attributes)
-                        (assoc :id type-name
-                               :user user
-                               :created (now)))]
-      (jdbc/insert! conn type-table type-info)
-      (doseq [attribute-spec (:attributes type-spec)]
-        (let [schema-id (get-sql-type (:schema attribute-spec))
-              attribute-info (-> attribute-spec
-                                 (assoc :type type-name :schema_id schema-id )
-                                 (dissoc :schema))]
-          (jdbc/insert! conn attribute-table attribute-info)))
-      (create-entity-table! conn type-spec)
+                        (assoc :user user
+                               :created (now)))
+          type-id (d/insert! conn type-table type-info)
+          attribute-specs (:attributes type-spec)
+          attributes (map #(-> %
+                               (assoc :type type-id
+                                      :schema_id (get-sql-type (:schema %)))
+                               (dissoc :schema)) attribute-specs)]
+      (doseq [attribute attributes]
+        (d/insert! conn attribute-table attribute))
+      (create-entity-table! conn type-id attributes)
       (create-tag-table! conn type-id)
       (create-lesson-table! conn type-id)
       (create-lesson-entity-table! conn type-id)
       (create-answer-table! conn type-id)
-      (create-session-table! conn type-id))))
+      (create-session-table! conn type-id)
+      type-id)))
+
+(defn select-type
+  [config type-id]
+  (let [query "select * from attributes where type = ?"
+        attributes (jdbc/query config [query type-id])
+        attributes (into [] (map (fn [attribute]
+                                   (replace-key (dissoc attribute :type) :schema_id :schema get-schema)))
+                         attributes)
+        query "select * from types where id = ?"
+        info (first (jdbc/query config [query type-id]))]
+    (assoc info :id type-id :attributes attributes)))
+
+(deft get-type
+  [config type-id]
+  {:status :ok :body (select-type config type-id)})
 
 (defn create-type!
-  [config user {:keys [id attributes] :as type-spec}]
+  [config user {:keys [label description attributes] :as type-spec}] 
   (cond
-    (empty? attributes) {:status :invalid :message "At least one attribute is required."} 
-    (type-exists? config id) {:status :invalid :message (str "ID " id " is taken.")} 
+    ;; TODO: better/more validation
+    (nil? label) {:status :invalid :body "A label is required."}
+    (nil? description) {:status :invalid :body "A description is required."}
+    (empty? attributes) {:status :invalid :body "At least one attribute is required."} 
     :else
     (try
-      (set-up-type! config user type-spec)
-      {:status :ok}
+      (let [type-id (set-up-type! config user type-spec)]
+        {:status :ok :body (select-type config type-id)})
       (catch Exception e
-        (println e)
         {:status :error
-         :message (str "Failed to create type: " (name (:id type-spec)))
+         :body (str "Failed to create type: " label)
          :exception e}))))
 
 (deft delete-type!
@@ -264,100 +265,89 @@
   (if (type-exists? config type-id)
     (jdbc/with-db-connection [conn config]
       (try 
-        (dyn/drop-tables! config [(session-table type-id)
+        (d/drop-tables! config [(session-table type-id)
                                   (answer-table type-id)
                                   (lesson-entity-table type-id)
                                   (lesson-table type-id)
                                   (tag-table type-id)
                                   (entity-table type-id)]) 
-        (jdbc/delete! config attribute-table ["type = ?" (name type-id)])
-        (jdbc/delete! config type-table ["id = ?" (name type-id)]) 
+        (jdbc/delete! config attribute-table ["type = ?" type-id])
+        (jdbc/delete! config type-table ["id = ?" type-id]) 
         {:status :ok}
         (catch Exception e
           {:status :error
-           :message (str "Failed to delete type:" (name type-id))
+           :body (str "Failed to delete type:" type-id)
            :exception e})))
-    {:status :missing :message "That type doesn't exist."}))
-
-(defn select-type
-  [config type-id]
-  (let [query "select * from attributes where type = ?"
-        attributes (jdbc/query config [query (name type-id)])
-        attributes (into [] (map (fn [attribute]
-                                   (replace-key (dissoc attribute :type) :schema_id :schema get-schema)))
-                         attributes)
-        query "select * from types where id = ?"
-        info (first (jdbc/query config [query (name type-id)]))]
-    (assoc info :id (keyword type-id) :attributes attributes)))
-
-(deft get-type
-  [config type-id]
-  {:status :ok :body (select-type config type-id)})
+    {:status :missing :body "That type doesn't exist."}))
 
 (defn get-types
   [config]
-  (let [type-ids (jdbc/query config ["select id from types"] :row-fn #(keyword (:id %)))]
+  (let [type-ids (jdbc/query config ["select id from types"] :row-fn :id)]
     {:status :ok :body (mapm (fn [type-id] [type-id (select-type config type-id)]) type-ids)}))
 
 (deft count-entities
   [config type-id]
-  {:status :ok :body (dyn/count-rows config (entity-table type-id))}) 
+  {:status :ok :body (d/count-rows config (entity-table type-id))}) 
 
 (defn select-entities-by-id-range
   [config type-id start-id end-id]
   (let [query (str "select * from " (entity-table type-id) " where id between ? and ?")]
     (jdbc/query config [query start-id end-id])))
 
+(defn get-attribute-id
+  [config type-id label]
+  (let [command "select id from attributes where type = ? and label = ?"]
+    (jdbc/query config [command type-id label])))
+
 (deft add-entity!
   [config type-id user entity]
   (let [table (entity-table type-id)
-        row-count (dyn/count-rows config table )
+        row-count (d/count-rows config table )
         entity-id (inc row-count)
-        prepared-entity (dissoc (assoc entity :user user :id entity-id :created (now))
-                                :type-id) 
+        prepared-entity (dissoc (assoc entity :user user :id entity-id :created (now)) :type-id)
         result (jdbc/insert! config table prepared-entity)]
-    (dyn/get-row-by-id config table :id entity-id)))
+    (d/get-row-by-id config table :id entity-id)))
 
 (deft get-entity
   [config type-id id]
-  (dyn/get-row-by-id config (entity-table type-id) :id id))
+  (d/get-row-by-id config (entity-table type-id) :id id))
 
 (deft get-random-entity
   [config type-id]
-  (dyn/get-random-row config (entity-table type-id) :id))
+  (d/get-random-row config (entity-table type-id) :id))
 
 (deft get-random-entities
   [config type-id n]
-  (dyn/get-random-rows config (entity-table type-id) :id n))
+  (d/get-random-rows config (entity-table type-id) :id n))
 
 (deft get-entities-by-id-range
   [config type-id start-id end-id]
-  (dyn/get-rows-in-range config (entity-table type-id) :id start-id end-id))
+  (d/get-rows-in-range config (entity-table type-id) :id start-id end-id))
 
 (deft update-entity!
   [config type-id entity-id entity]
   (let [table (entity-table type-id)
-        stored-entity (dyn/select-by-id config table entity-id)]
+        stored-entity (d/select-by-id config table entity-id)]
     (if (nil? stored-entity)
-      {:status :missing :message (str "No entity of type " (name type-id) " found with ID " entity-id)}
+      {:status :missing :body (str "No entity of type " type-id " found with ID " entity-id)}
       (let [merged-entity (merge stored-entity entity)
             cleaned-entity (dissoc merged-entity :created :modified :id)]
         (jdbc/update! config table cleaned-entity ["id = ?" entity-id]) 
-        {:status :ok :body (dyn/select-by-id config table entity-id)}))))
+        {:status :ok :body (d/select-by-id config table entity-id)}))))
 
 ;; potentially dangerous
 (deft delete-entity!
   [config type-id entity-id]
   (if (< entity-id 0)
-    {:status :error :message "That's a negative entity ID!"}
-    (let [row-count (dyn/count-rows config (entity-table type-id))]
+    {:status :error :body "That's a negative entity ID!"}
+    (let [row-count (d/count-rows config (entity-table type-id))]
       (if (> entity-id row-count)
-        {:status :error :message (str "No entity of type " (name type-id) " with ID " entity-id)}
+        {:status :error :body (str "No entity of type " type-id " with ID " entity-id)}
         (if (= row-count entity-id)
           (do (jdbc/delete! config (entity-table type-id) ["id = ?" entity-id])
               {:status :ok}) 
           (let [table (entity-table type-id)
-                last-entity (dyn/select-by-id config table row-count)
+                last-entity (d/select-by-id config table row-count)
                 new-entity (dissoc (assoc last-entity :id entity-id) :modified)]
             (jdbc/delete! config table ["id = ?" entity-id])
             (jdbc/update! config table new-entity ["id = ?" row-count])
@@ -376,7 +366,7 @@
 
 (deft tag-entity!
   [config type-id entity-id tag]
-  (if-let [entity (dyn/select-by-id config (entity-table type-id) entity-id)]
+  (if-let [entity (d/select-by-id config (entity-table type-id) entity-id)]
     (if (has-tag? config type-id  entity-id tag)
       {:status :exists}
       (let [table (tag-table type-id)]
@@ -386,7 +376,7 @@
 
 (deft untag-entity!
   [config type-id entity-id tag]
-  (if-let [entity (dyn/select-by-id config (entity-table type-id) entity-id)]
+  (if-let [entity (d/select-by-id config (entity-table type-id) entity-id)]
     (if (has-tag? config type-id  entity-id tag)
       (let [query "id = ? and tag = ?"]
         (jdbc/delete! config (tag-table type-id) [query entity-id tag])
@@ -402,7 +392,7 @@
 
 (deft get-entity-tags
   [config type-id entity-id]
-  (if-let [entity (dyn/select-by-id config (entity-table type-id) entity-id)]
+  (if-let [entity (d/select-by-id config (entity-table type-id) entity-id)]
     (let [query (str "select tag from " (tag-table type-id) " where id = ?")
           tags (vec (jdbc/query config [query entity-id] :row-fn :tag))]
       {:status :ok :body tags})
@@ -418,18 +408,18 @@
   (let [entity-ids (get-tag-ids config type-id tag)]
     (if (empty? entity-ids)
       {:status :ok :body []}
-      {:status :ok :body (dyn/select-by-ids config (entity-table type-id) entity-ids)})))
+      {:status :ok :body (d/select-by-ids config (entity-table type-id) entity-ids)})))
 
 (deft get-entities-for-user
   [config type-id user]
-  {:status :ok :body (dyn/select-equal config (entity-table type-id) :user user)})
+  {:status :ok :body (d/select-equal config (entity-table type-id) :user user)})
 
 (deft get-random-entity-with-tag
   [config type-id tag]
   (let [entity-ids (get-tag-ids config type-id tag)]
     (if (empty? entity-ids)
       {:status :missing}
-      (dyn/get-row-by-id config (entity-table type-id) :id (rand-nth entity-ids)))))
+      (d/get-row-by-id config (entity-table type-id) :id (rand-nth entity-ids)))))
 
 (deft get-random-entities-with-tag
   [config type-id tag n]
@@ -438,8 +428,8 @@
       {:status :missing}
       (if (< (count tag-ids) n)
         {:status :not-enough}
-        (let [entity-ids (dyn/take-unique-random n tag-ids)]
-          {:status :ok :body (dyn/select-by-ids config (entity-table type-id) entity-ids)})))))
+        (let [entity-ids (d/take-unique-random n tag-ids)]
+          {:status :ok :body (d/select-by-ids config (entity-table type-id) entity-ids)})))))
 
 (deft remove-from-lesson!
   [config type-id lesson-id entity-id]
@@ -449,39 +439,39 @@
 ;; lesson access
 (defn select-lesson-info
   [config type-id lesson-id]
-  (dyn/select-by-id config (lesson-table type-id) lesson-id))
+  (d/select-by-id config (lesson-table type-id) lesson-id))
 
 (defn select-lesson-entity-ids
   [config type-id lesson-id]
-  (map :entity (dyn/select-equal config (lesson-entity-table type-id) :lesson lesson-id)))
+  (map :entity (d/select-equal config (lesson-entity-table type-id) :lesson lesson-id)))
 
 (defn select-lesson-entities
   [config type-id lesson-id]
   (let [ids (select-lesson-entity-ids config type-id lesson-id)]
-    (dyn/select-by-ids config (entity-table type-id) ids)))
+    (d/select-by-ids config (entity-table type-id) ids)))
 
 (deft get-lesson-info
   [config type-id lesson-id]
   (if-let [info (select-lesson-info config type-id lesson-id)]
     {:status :ok :body info}
-    {:status :missing :message (str "No lesson of type " (name type-id) " found with ID " lesson-id)}))
+    {:status :missing :body (str "No lesson of type " type-id " found with ID " lesson-id)}))
 
 (deft get-lesson
   [config type-id lesson-id]
   (if-let [lesson (select-lesson-info config type-id lesson-id)]
     (let [entities (select-lesson-entities config type-id lesson-id)]
       {:status :ok :body (assoc lesson :entities entities)})
-    {:status :missing :message (str "No lesson of type " (name type-id) " found with ID " lesson-id)}))
+    {:status :missing :body (str "No lesson of type " type-id " found with ID " lesson-id)}))
 
 (deft get-lesson-entities
   [config type-id lesson-id]
   (if-let [info (select-lesson-info config type-id lesson-id)]
     {:status :ok :body (select-lesson-entities config type-id lesson-id)}
-    {:status :missing :message (str "No lesson of type " (name type-id) " found with ID " lesson-id)}))
+    {:status :missing :body (str "No lesson of type " type-id " found with ID " lesson-id)}))
 
 (deft get-lessons-for-user
   [config type-id user]
-  (let [lessons (dyn/select-equal config (lesson-table type-id) :user user)]
+  (let [lessons (d/select-equal config (lesson-table type-id) :user user)]
     {:status :ok :body lessons}))
 
 (deft remove-from-lesson!
@@ -491,14 +481,14 @@
 
 (deft get-lessons
   [config type-id]
-  (let [lessons (dyn/select-all config (lesson-table type-id))]
+  (let [lessons (d/select-all config (lesson-table type-id))]
     {:status :ok :body lessons}))
 
 (deft create-lesson!
   [config type-id user lesson]
-  (let [row-count (dyn/count-rows config (lesson-table type-id))
+  (let [row-count (d/count-rows config (lesson-table type-id))
         prepared-lesson (assoc lesson :user user :created (now))
-        lesson-id (dyn/insert! config (lesson-table type-id) prepared-lesson)]
+        lesson-id (d/insert! config (lesson-table type-id) prepared-lesson)]
     {:status :ok :body (select-lesson-info config type-id lesson-id)}))
 
 (deft add-to-lesson!
@@ -517,7 +507,7 @@
 
 (defn select-session
   [config type-id session-id]
-  (let [row (dyn/select-by-id config (session-table type-id) session-id)]
+  (let [row (d/select-by-id config (session-table type-id) session-id)]
     (parse-session row)))
 
 (deft get-session
@@ -525,61 +515,67 @@
   (let [session (select-session config type-id id)]
     (if session
       {:status :ok :body session}
-      {:status :missing :message (str "No session of type " (name type-id) " found with ID " id)})))
+      {:status :missing :body (str "No session of type " type-id " found with ID " id)})))
 
 (deft get-sessions
   [config type-id user-id]
-  {:status :ok :body (dyn/select-all config (session-table type-id) :row-fn parse-session)})
+  {:status :ok :body (d/select-all config (session-table type-id) :row-fn parse-session)})
 
 (deft get-sessions-for-user
   [config type-id user-id] 
-  {:status :ok :body (dyn/select-equal config (session-table type-id) :user user-id)})
+  {:status :ok :body (d/select-equal config (session-table type-id) :user user-id)})
 
 (defn get-random-lesson-entity-id
   [config type-id lesson-id]
-  (rand-nth (select-lesson-entity-ids config type-id lesson-id)))
+  (let [lesson-entity-ids (select-lesson-entity-ids config type-id lesson-id)]
+    (if (empty? lesson-entity-ids)
+      nil
+      (rand-nth lesson-entity-ids))))
 
 (deft create-session!
   [config type-id user lesson-id]
   (let [info (select-lesson-info config type-id lesson-id)
-        entity-id (get-random-lesson-entity-id config type-id lesson-id)
-        session {:lesson_id lesson-id
-                 :entity_id entity-id
-                 :user user
-                 :correct 0
-                 :total 0
-                 :length (:length info)
-                 :done 0
-                 :created (now)}
-        session-id (dyn/insert! config (session-table type-id) session)]
-    {:status :ok :body (select-session config type-id session-id)}))
+        entity-id (get-random-lesson-entity-id config type-id lesson-id)]
+    (if entity-id
+      (let [session {:lesson_id lesson-id
+                     :entity_id entity-id
+                     :user user
+                     :correct 0
+                     :total 0
+                     :length (:length info)
+                     :done 0
+                     :created (now)}
+            session-id (d/insert! config (session-table type-id) session)]
+        {:status :ok :body (select-session config type-id session-id)})
+      {:status :bad :body "Empty lesson!"})))
 
 (defn record-entity-answer!
-  [config type-id entity-id user correct?]
-  (let [table (answer-table type-id)
+  [config type-id entity-id user start correct?]
+  (let [start (name start)
+        table (answer-table type-id)
         ;; TODO: select-where
-        query (str "select * from " table " where id = ? and user = ?")
-        row (first (jdbc/query config [query entity-id user]))]
+        query (str "select * from " table " where id = ? and user = ? and start = ?")
+        row (first (jdbc/query config [query entity-id user start]))]
     (if (nil? row)
       (let [correct (if correct? 1 0)]
-        (jdbc/insert! config table {:id entity-id :user user :correct correct :total 1 :created (now)}))
+        (jdbc/insert! config table {:id entity-id :user user :correct correct :total 1 :start start :created (now)}))
       (let [previous (:correct row)
             correct (if correct? (inc previous) previous) 
             total (inc (:total row))] 
-        (jdbc/update! config table {:correct correct :total total} ["id = ? and user = ?" entity-id user])))))
+        (jdbc/update! config table {:correct correct :total total} ["id = ? and user = ? and start = ?" entity-id user start])))))
 
 (deft record-individual-answer!
-  [config type-id entity-id user correct?]
-  (record-entity-answer! config type-id entity-id user correct?)
+  [config type-id entity-id user start correct?]
+  (record-entity-answer! config type-id entity-id user start correct?)
   {:status :ok})
 
 (deft record-answer!
-  [config type-id user session-id entity-id correct?]
+  [config type-id user session-id entity-id start correct?]
   (let [{done? :done session-entity-id :entity-id :as session} (select-session config type-id session-id)]
     (cond
-      (nil? session) {:status :what :message "TODO: no session"}
-      done? {:status :what :message "TODO: already done?"}
-      (not= entity-id session-entity-id) {:status :what :message "TODO: entity mismatch?"}
+      (nil? session) {:status :what :body "TODO: no session"}
+      done? {:status :what :body "TODO: already done?"}
+      (not= entity-id session-entity-id) {:status :what :body "TODO: entity mismatch?"}
       :else (let [{:keys [total length correct lesson-id]} session
                   total (inc total)
                   correct (if correct? (inc correct) correct)
@@ -590,12 +586,12 @@
                                           :total total
                                           :done done?
                                           :entity_id new-entity-id} ["id = ?" session-id])
-              (record-entity-answer! config type-id entity-id user correct?)
+              (record-entity-answer! config type-id entity-id user start correct?)
               {:status :ok :body (select-session config type-id session-id)}))))
 
 (deft get-stats
   [config type-id entity-id user]
-  (if-let [entity (dyn/select-by-id config (entity-table type-id) entity-id)]
+  (if-let [entity (d/select-by-id config (entity-table type-id) entity-id)]
     (let [table (answer-table type-id)
           query (str "select * from " table " where id = ? and user = ?")
           row (first (jdbc/query config [query entity-id user]))]
@@ -645,15 +641,15 @@
   (remove-from-lesson! [_ type-id lesson-id entity-id] (remove-from-lesson! config type-id lesson-id entity-id))
 
   (create-session! [_ type-id lesson-id] (create-session! config type-id user lesson-id))
-  (record-answer! [_ type-id session-id entity-id correct?] 
-    (record-answer! config type-id user session-id entity-id correct?))
+  (record-answer! [_ type-id session-id entity-id start correct?] 
+    (record-answer! config type-id user session-id entity-id start correct?))
   (get-session [_ type-id session-id] (get-session config type-id session-id))
 
   (get-sessions [_ type-id] (get-sessions config type-id user))
   (get-sessions-for-user [_ type-id user-id] (get-sessions-for-user config type-id user))
   
-  (record-individual-answer! [_ type-id entity-id correct?]
-    (record-individual-answer! config type-id entity-id user correct?))
+  (record-individual-answer! [_ type-id entity-id start correct?]
+    (record-individual-answer! config type-id entity-id user start correct?))
   
   (get-stats [_ type-id entity-id] (get-stats config type-id entity-id user))
   

@@ -1,69 +1,73 @@
 (ns mike.http
-  (:refer-clojure :exclude [get]) 
+  (:refer-clojure :exclude [get put]) 
   #?(:cljs (:require-macros [cljs.core.async.macros :refer [go]]))
   (:require [clojure.walk :refer [keywordize-keys]]
+            [clojure.string :refer [blank?]]
             #?(:clj [clojure.data.json :as json]) 
             #?(:clj [clj-http.client :as http]
                     :cljs [cljs-http.client :as http])
             #?(:clj [clojure.core.async :refer [go]])))
 
-(defn handle-exceptions
-  [request]
-  (assoc request :throw-exceptions (or (:throw-exceptions request) false)))
+(defprotocol Giraffe
+  "?"
+  (get [client url request] "GET")
+  (pet [client url request] "PUT")
+  (post [client url request] "POST")
+  (delete [client url request] "DELETE"))
 
-(defn parse-json
+(defrecord BabyGiraffe [wrap-request wrap-response]
+  Giraffe
+  (get [_ url request]
+    #?(:clj (go (wrap-response (http/get url (wrap-request request))))
+       :cljs (wrap-response (http/get url (wrap-request request)))))
+
+  (pet [_ url request]
+    #?(:clj (go (wrap-response (http/put url (wrap-request request))))
+            :cljs (wrap-response (http/put url (wrap-request request)))))
+  
+  (post [_ url request]
+    #?(:clj (go (wrap-response (http/post url (wrap-request request))))
+       :cljs (wrap-response (http/post url (wrap-request request)))))
+
+  (delete [_ url request]
+    #?(:clj (go (wrap-response (http/delete url (wrap-request request))))
+       :cljs (wrap-response (http/delete url (wrap-request request))))))
+
+(defn from-json
   [body]
   #?(:clj (json/read-str body)
      :cljs body))
 
-(defn handle-json-body
-  [{body :body :as response}]
-  (assoc response :body (keywordize-keys (parse-json body))))
+(defn to-json
+  [body]
+  #?(:clj (json/write-str body)
+     :cljs (js/JSON.stringify (clj->js body))))
 
-#?(:clj
-   (defn get
-     [resource & [request]]
-     (go (let [request (handle-exceptions request)]
-           (http/get resource request)))))  
+(defn no-exceptions
+  [request]
+  (assoc request :throw-exceptions false))
 
-#?(:cljs
-   (defn get
-     [resource & [request]]
-     (let [request (handle-exceptions request)]
-       (http/get resource request))))
+(defn json-response-body
+  [{:keys [status body] :as response}]
+  (println "BODY: " body)
+  (if (blank? body)
+    response
+    (update response :body (comp keywordize-keys from-json))))
 
-#?(:clj
-   (defn post
-     [resource & [request]]
-     (go (let [request (handle-exceptions request)]
-           (http/post resource request)))))
+(defn json-request-body
+  [request]
+  (if (:body request)
+    (update request :body to-json)
+    request))
 
-#?(:cljs
-   (defn post
-     [resource & [request]]
-     (let [request (handle-exceptions request)]
-       (http/post resource request))))
+;; TODO: clj-http and cljs-http basic-auth format is different, which sucks
+(defn basic-auth
+  [request]
+  #?(:cljs (let [credentials (:basic-auth request)]
+             (if credentials
+               (assoc request :basic-auth {:username (first credentials)
+                                           :password (second credentials)})
+               request))
+     :clj request))
 
-#?(:clj
-   (defn put
-     [resource & [request]]
-     (go (let [request (handle-exceptions request)]
-           (http/put resource request)))))
-
-#?(:cljs
-   (defn put
-     [resource & [request]]
-     (let [request (handle-exceptions request)]
-       (http/put resource request))))
-
-#?(:clj
-   (defn delete
-     [resource & [request]]
-     (go (let [request (handle-exceptions request)]
-           (http/delete resource request)))))
-
-#?(:cljs
-   (defn delete
-     [resource & [request]]
-     (let [request (handle-exceptions request)]
-       (http/delete resource request))))
+(defn fun-client [] (BabyGiraffe. (comp no-exceptions basic-auth json-request-body) json-response-body))
