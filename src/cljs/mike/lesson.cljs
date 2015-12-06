@@ -44,7 +44,8 @@
                    [s/Channel :created-lesson api/create-lesson! [@repo :type-id :lesson]]
                    [s/Function :lesson-data get-lesson-template [:type] :no-channel]
                    [s/Channel :lessons api/get-lessons [@repo :type-id]]
-                   [s/Value :message "Created lesson!"]]))
+                   [s/Value :body "Created lesson!"]
+                   [s/SetMode :browse]]))
 
 (defn load-lessons!
   [state]
@@ -77,7 +78,7 @@
   (s/batch! state [[s/Value :entity-id entity-id]
                    [s/Channel nil api/remove-from-lesson! [@repo :type-id [:lesson :id] :entity-id]]
                    [s/Channel :lesson api/get-lesson [@repo :type-id [:lesson :id]]]
-                   [s/Value :message "Removed entity!"]]))
+                   [s/Value :body "Removed entity!"]]))
 
 (defn add-entity!
   [state]
@@ -87,7 +88,7 @@
                    [s/Channel :created-entity api/add-entity! [@repo :type-id :entity]]
                    [s/Channel nil api/add-to-lesson! [@repo :type-id [:lesson :id] [:created-entity :id]]]
                    [s/Channel :lesson api/get-lesson [@repo :type-id [:lesson :id]]]
-                   [s/Value :message "Added entity!"]]))
+                   [s/Value :body "Added entity!"]]))
 
 (defn render-lesson
   [state]
@@ -122,8 +123,8 @@
   [state lesson]
   (let [{:keys [id name]} lesson]
     (s/batch! state [[s/Value :lesson-name name]
-                     [s/SpawnMode id name name render-lesson {:flag :loading-lesson
-                                                              :secondary "Lesson"}]
+                     [s/SpawnMode :lesson name name render-lesson {:flag :loading-lesson
+                                                                   :secondary "Lesson"}]
                      [s/Channel :lesson api/get-lesson [@repo :type-id id]]
                      [s/Value :loading-lesson false]])))
 
@@ -133,8 +134,8 @@
     [:div {:style {"marginTop" "20px"}}
      (f/cool state "Create Lesson" "Create" :lesson-data create-lesson!)
      (when creating-lesson
-       [:p "Creating lesson..."])]))
-
+       [:p "Creating lesson..."])])
+)
 (defn render-browse
   [state]
   (let [{:keys [error message type-id type types lessons loading-lessons creating-lesson]} @state]
@@ -165,11 +166,11 @@
 
 (defn app
   [api-url username type-id]
-  (println "Initializing... " (str "{:api-url " api-url " :username" username " :type-id " type-id "}"))
+  (println "Initializing... " {:api-url api-url :username username :type-id type-id})
   (reset! repo (HttpEntityRepo. api-url username "friend"))
   (let [state (r/atom {:user username
                        :mode :home
-                       :type-id (keyword type-id)
+                       :type-id (keyword (str type-id)) 
                        :modes {:home {:title "Lessons"
                                       :label "Lessons"
                                       :render render-home}
@@ -182,12 +183,14 @@
     (load-lessons! state)
     (fn []
       (println "Rendering mode" (:mode @state) "...")
-      (p/page2 state "Lessons" identity))))
+      (p/page2 state "Lessons"))))
+
+(def info (partial println "[Lesson]"))
 
 (defn ^:export start [api-url username type-id]
-  (println "Starting app...")
+  (info "[Lesson] Starting app...")
   (r/render [(partial app api-url username type-id)] (js/document.getElementById "page-wrapper")))
 
 (defn ^:export reload []
-  (println "Reloading app...")
-  (r/render [(partial app "http://localhost:8080/api/" "mike" nil)] (js/document.getElementById "page-wrapper")))
+  (info "[Lesson] Reloading app...")
+  (r/render [(partial app "http://localhost:8080/api/" "mike" 1)] (js/document.getElementById "page-wrapper")))

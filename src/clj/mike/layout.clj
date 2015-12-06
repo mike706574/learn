@@ -46,10 +46,9 @@
           {:type "button"}
           [:i.fa.fa-search]]]]]
       (map #(side-link current %) [[:dashboard "Dashboard" "/" "fa-dashboard"]
-                                   [:lessons "Alligator" "/alligator" "fa-table"]
-                                   [:flash "Flashcards" "/flash" "fa-play"]
+                                   [:types "Types" "/types" "fa-wrench"]
                                    [:lessons "Lessons" "/lessons" "fa-table"] 
-                                   [:types "Types" "/types" "fa-wrench"]]))]]])
+                                   [:flash "Flashcards" "/flash" "fa-play"]]))]]])
 
 (defn top-right
   [username current type]
@@ -92,7 +91,7 @@
     (top-bar username :dashboard type)
     [:div#page-wrapper
      [:div.row
-      [:div.col-lg-12 [:h1.page-header "Dashboard"]]] 
+      [:div.col-lg-12 [:h2.page-header "Dashboard"]]] 
      [:div.row
       [:div.col-lg-3.col-md-6
        [:div.panel.panel-primary
@@ -165,15 +164,13 @@
       [:div#app.container-fluid
        [:div.row
         [:div.col-lg-12
-         [:h1.page-header title]
+         [:h2.page-header title]
          [:h4
           [:span.fa.fa-refresh.fa-spin.fa-fw.margin-bottom]
           " Loading page..."]]]]]]
     scripts
     (p/include-js "js/client.js")
-    (println "TYPE:" type)
     (let [type-id (if type (:id type) "null")]
-      (println "TID:" type-id)
       [:script (str "mike." namespace ".start('" api-url "','" username "'," type-id ");")])]))
 
 (defn login
@@ -309,7 +306,7 @@
      [:div.row
       [:div.col-md-12
        [:div {:style "padding: 40px 15px; text-align: center;"}
-        [:h1 "What?"]
+        [:h2 "What?"]
         [:p "Something is probably broken."]
        [:div {:style "margin-top: 15px; margin-bottom: 15px;"}
         [:a.btn.btn-primary {:href "/" :style "margin-right: 10px;"}

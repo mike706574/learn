@@ -43,13 +43,11 @@
   (get-session [repo type-id session-id] "Get a lesson session.")
 
   (get-sessions [repo type-id] "Get all sessions.")
-  (get-sessions-for-user [repo type-id user-id] (get-sessions config type-id user))
+  (get-sessions-for-user [repo type-id criteria] "Get user sessions.")
 
   (record-individual-answer! [repo type-id entity-id start correct?] "Record an answer.")
   (get-stats [repo type-id entity-id] "Get stats.")
 
   (get-entities-for-user [repo type-id other-user] "Get entities for a user.")
   (get-lessons-for-user [repo type-id other-user] "Get all lessons for a user.")
-  (get-stats-for-user [repo type-id entity-id other-user] "Get stats.")
-
-  )
+  (get-stats-for-user [repo type-id entity-id other-user] "Get stats."))

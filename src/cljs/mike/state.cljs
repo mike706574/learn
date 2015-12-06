@@ -129,6 +129,13 @@
                 (recur (rest remaining-calls) (assoc updated k body) (assoc changes k body)))
               (error! state message)))))))
 
+(defn kill-mode!
+  [state target dest]
+  (swap! state (fn [state]
+                 (-> state
+                     (update :modes #(dissoc % target))
+                     (assoc :mode dest)))))
+
 (def Function :function)
 (def Channel :channel)
 (def Value :value)

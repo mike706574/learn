@@ -17,21 +17,6 @@
 
 (def repo (atom nil))
 
-;; todo: make this work!
-(def schema-options {"str" "String"
-                     "int" "Integer"})
-
-(def attribute-template
-  {:id {:value "" :label "ID" :type :text}
-   :label {:value "" :label "Label" :type :text}
-   :description {:value "" :label "Description" :type :text}
-   :schema {:value "" :label "Schema" :type :select :options schema-options}})
-
-(def type-template {:label {:value "" :label "Label" :type :text}
-                    :description {:value "" :label "Description" :type :text}
-                    :attributes {:value [] :label "Attributes" :type :list :template attribute-template}})
-;; end
-
 (def empty-attribute {:id "" :label "" :schema "str" :description ""})
 
 (defn delete-type!
@@ -54,20 +39,16 @@
     (when deletable?
       [:button.btn.btn-danger
        {:type "button" :on-click #(delete-type! state id)} "Delete"])
-    
-    
+
     (when selectable?
-      [:form {:action "/current-type" :method "post"}
+      [:form.pull-right {:action "/current-type" :method "post"}
        [:input {:type "hidden" :name "type-id" :value id}]
-       [:input.btn.btn-primary.pull-right {:type "submit"
-                                           :value "Select"}]])]])
+       [:input.btn.btn-primary {:type "submit" :value "Select"}]])]])
 
 (defn render-browse
   [state]
   (let [{:keys [types type-id error message]} @state
-        current-type (get types type-id)]
-    (println "TID" type-id)
-    (println "OK" types)
+        current-type (get types type-id)] 
     (if current-type
       (let [current-type (get types type-id)
             other-types (vals (dissoc types type-id))]
@@ -127,6 +108,7 @@
                [:div.panel-heading (str "Attribute #" (inc index))]
                [:div.panel-body 
                 [:div.form-group
+                 [:label {:for :label} "Identifier"]
                  [:input.form-control
                   {:type :text
                    :name :id
@@ -142,15 +124,14 @@
                    :placeholder "Label"
                    :value label
                    :on-change #(s/set-in! state [:new-type :attributes index :label] (b/get-value %))}]] 
-                [:div.form-group
-                 [:label {:for :schema} "Schema"]
-                 [:select.form-control
-                  {:key :schema
-                   :id :schema
-                   :on-change #(s/set-in! state [:new-type :attributes index :schema] (b/get-value %))}
-                  [:option {:value "str"} "String"]
-;;                  [:option {:value "int"} "Integer"]
-                  ]]
+;;                 [:div.form-group
+;;                  [:label {:for :schema} "Schema"]
+;;                  [:select.form-control
+;;                   {:key :schema
+;;                    :id :schema
+;;                    :on-change #(s/set-in! state [:new-type :attributes index :schema] (b/get-value %))}
+;;                   [:option {:value "str"} "String"]
+;;                   [:option {:value "int"} "Integer"]]]
                 [:div.form-group
                  [:label {:for :description} "Description"]
                  [:input.form-control
@@ -185,18 +166,16 @@
                        :mode :browse
                        :new-type {}
                        :type-id (keyword (str type-id))
-                       :loading true
-                       :modes {:browse {:title "Types" :label "Browse Types" :render render-browse}
+                       :modes {:browse {:title "Types" :label "Types" :render render-browse}
                                :create {:title "Create" :label "Create Type" :render render-create}}})]
     (s/batch! state [[s/Channel :types api/get-types [@repo]]
                      [s/Value :loading false]])
     (fn []
       (println "Rendering...")
-      (p/page2 state "Types" identity))))
+      (p/page2 state "Types"))))
 
 (defn ^:export start [api-url username type-id]
   (println "Starting app...")
-  (println "TYPE ID:" type-id)
   (r/render [(partial app api-url username type-id)] (js/document.getElementById "page-wrapper")))
 
 (defn ^:export reload []

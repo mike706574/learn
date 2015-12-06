@@ -27,3 +27,10 @@
 (defn runtime [& args] (throw (ex-info (apply str args))))
 
 (defn now [] (tc/to-date (t/now)))
+
+(defn parse-boolean
+  [x]
+  (case x
+    "true" true
+    "false" false
+    (throw (ex-info "I don't even know."))))

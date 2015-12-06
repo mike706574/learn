@@ -182,3 +182,24 @@
 (defn drop-tables-quietly!
   [config tables]
   (doseq [table tables] (drop-table-quietly! config table)))
+
+(defn get-table-names
+  [db]
+  (map :table_name (jdbc/with-db-metadata [md db]
+       (jdbc/metadata-result (.getTables md nil nil nil (into-array ["TABLE" "VIEW"]))))))
+
+(defn drop-all-tables!
+  [db]
+  (doseq [table-name (get-table-names db)]
+    (jdbc/execute! db [(str "drop table " table-name)])))
+
+(defn drop-database!
+  [config database-name]
+  (jdbc/execute! config [(str "drop database " database-name)]))
+
+(defn create-database!
+  [config database-name]
+  (let [command (str "create database "
+                     database-name
+                     " character set utf8 collate utf8_general_ci;")]
+    (jdbc/execute! config [command])))

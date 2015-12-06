@@ -28,7 +28,6 @@
 
 (defn post
   [username password url body]
-  (println "IM HERE" username password)
   (handle-response (http/post (fun-client) url {:body body
                                                 :content-type "application/json"
                                                 :basic-auth [username password]
@@ -37,7 +36,7 @@
 
 (defn put
   ([username password url]
-   (put username url {}))
+   (put username password url {}))
   ([username password url body]
    (handle-response (http/pet (fun-client) url {:headers {"content-type" "application/json"
                                                           "accept" "application/json"}
@@ -48,7 +47,6 @@
   ([username password url]
    (get username password url {}))
   ([username password url query-params]
-   (println "U:" username "P: password")
    (handle-response (http/get (fun-client) url {:query-params query-params
                                                 :basic-auth [username password]
                                                 :headers {"accept" "application/json"}}))))
@@ -59,7 +57,6 @@
   (delete-type! [_ type-id] (delete user password (build-url path "type" type-id)))
   (get-type [_ type-id] (get user password (build-url path "type" type-id))) 
   (get-types [_]
-    (println "GETTING TYPES " user password )
     (get user password (build-url path "types")))
 
   (count-entities [_ type-id]
@@ -117,8 +114,8 @@
 
   (get-sessions [_ type-id] "Get all sessions."
     (get user password (build-url path "type" type-id "sessions")))
-  (get-sessions-for-user [_ type-id user-id]
-    (get user password (build-url path "type" type-id "sessions") {:user-id user-id}))
+  (get-sessions-for-user [_ type-id criteria]
+    (get user password (build-url path "type" type-id "sessions") criteria))
   
   (record-individual-answer! [_ type-id entity-id start correct?] nil)
   (get-stats [_ type-id entity-id] nil)

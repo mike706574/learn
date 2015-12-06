@@ -67,18 +67,20 @@
 
 (defn ok? [status] (= (keyword status) :ok))
 
+(def cake (JdbcEntityRepo. entity-db "mike"))
+
 (def username #(:username (friend/current-authentication)))
 (def repo #(JdbcEntityRepo. entity-db (username)))
 (defn type []
   (when-let [type-id (auth/get-current-type auth-db (username))]
     
-    (let [{:keys [status body] :as result} (<!! (api/get-type (repo) type-id))]
-        (case status
-          :ok body
-          :missing (do (println "Type" type-id "was probably deleted...?")
-                       (auth/set-current-type! auth-db (username) nil)
-                       nil)
-          (throw (ex-info "Error fetching user type!" result))))))
+    (let [{:keys [status body exception] :as result} (<!! (api/get-type (repo) type-id))]
+      (case status
+        :ok body
+        :missing (do (println "Type" type-id "was probably deleted...?")
+                     (auth/set-current-type! auth-db (username) nil)
+                     nil)
+        (throw (ex-info "Error fetching user type!" result))))))
 
 (defroutes api-routes  
   (POST "/api/type"
@@ -119,7 +121,6 @@
 
   (POST "/api/type/:type-id/entity"
         {{type-id :type-id} :params body :body :as request}
-        (println "OKOKOKO:" body)
         (to-response (api/add-entity! (repo) type-id body) request))
   
   (GET "/api/type/:type-id/entities"
@@ -185,11 +186,9 @@
        (to-response (api/get-session (repo) type-id (m/parse-int session-id)) request))
 
   (GET "/api/type/:type-id/sessions"
-       {{:keys [type-id user-id]} :params :as request}
+       {{:keys [type-id done] :as params} :params :as request}
        (to-response
-        (if user-id
-          (api/get-sessions-for-user (repo) type-id user-id)
-          (api/get-sessions (repo) type-id))
+        (api/get-sessions-for-user (repo) type-id params)
         request))
 
   ;; STATS
@@ -237,7 +236,7 @@
 
   (GET "/flash" request
        (friend/authenticated
-        (type-page "Flash" "flash")))
+        (type-page "Flashcards" "flash")))
 
   (GET "/alligator" request
        (friend/authenticated
@@ -297,14 +296,12 @@
 
 (defn wrap-api
   [handler]
-  (println "HI")
   ;; TODO: ?
   (fn [{headers :headers :as request}]
     (let [accept-header (get headers "accept")
           json? (= accept-header "application/json")
           accept (if json? :json nil)
           user (get headers "lang-user")]
-      (println "API:" user)
       (handler (assoc request :accept accept :user user)))))
 
 (def api-handler
@@ -318,7 +315,6 @@
        :unauthenticated-handler #(workflows/http-basic-deny "api" %)
        :workflows [(workflows/http-basic
                     :credential-fn #(let [{:keys [username password]} %]
-                                      (println "OKOK: " %)
                                       (when (= password "friend")
                                         {:identity username :username username}))
                     :realm "api")]}))
@@ -327,7 +323,6 @@
 (defn app
   [{:keys [headers request-method accept uri method] :as request}]
   ;; todo: real logging
-  (println "Request:" request-method uri accept)
   (if (.startsWith uri "/api")
     (api-handler request)
     (site-handler request)))

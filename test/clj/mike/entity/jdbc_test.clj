@@ -4,6 +4,7 @@
             [mike.dynamite :as dynamite]
             [clojure.pprint :refer [pprint]]
             [mike.config :as c]
+            [mike.dynamite :as d]
             [mike.misc :refer [fmap]]
             [clojure.java.jdbc :as jdbc]
             [clojure.core.async :refer [<!!]]
@@ -11,18 +12,6 @@
   (:import [mike.entity.jdbc JdbcEntityRepo]))
 
 ;; (clojure.test/test-vars [#'mike.entity.jdbc-test/lessons])
-
-;; TODO: move to dynamite
-(defn drop-database!
-  [config database-name]
-  (jdbc/execute! config [(str "drop database " database-name)]))
-
-(defn create-database!
-  [config database-name]
-  (let [command (str "create database "
-                     database-name
-                     " character set utf8 collate utf8_general_ci;")]
-    (jdbc/execute! config [command])))
 
 (def full-db {:subprotocol "mysql"
                 :subname "//localhost:3306"
@@ -34,10 +23,10 @@
                 :user "root"
                 :password "goose"})
 
-(defn tear-down! [] (drop-database! full-db "entity_test"))
+(defn tear-down! [] (d/drop-database! full-db "entity_test"))
 
 (defn set-up! []
-  (create-database! full-db "entity_test")
+  (d/create-database! full-db "entity_test")
   (j/create-type-table! entity-db)
   (j/create-attribute-table! entity-db))
 
@@ -509,25 +498,28 @@
         (is (= :ok status))
         (is (= [(data-only entity)] (map data-only body))))
       
-      (let [{:keys [status body]} (<!! (api/get-sessions repo @en-it))]
-        (is (= :ok status))
-        (is (= [] body)))
+      (is (= {:status :ok :body []} (<!! (api/get-sessions repo @en-it))))
+      (is (= {:status :ok :body []} (<!! (api/get-sessions-for-user repo @en-it {}))))
+      (is (= {:status :ok :body []} (<!! (api/get-sessions-for-user repo @en-it {:done false}))))
+      (is (= {:status :ok :body []} (<!! (api/get-sessions-for-user repo @en-it {:done true}))))
 
       (let [{:keys [status body exception]} (<!! (api/create-session! repo @en-it @$lesson-id))]
         (is (= :ok status))
-        (let [{:keys [id user correct total done]} body]
-          (is (= @$lesson-id id))
+        (let [{:keys [id lesson-id name user correct total done]} body]
+          (is (= @$lesson-id lesson-id))
+          (is (= "Beginner" name))
           (is (= "mike" user))
           (is (= 0 correct))
           (is (= 0 total))
           (is (not done))
-          (reset! $session-id (:id body))))
+          (reset! $session-id id)))
 
-      (let [{:keys [status body]} (<!! (api/get-session repo @en-it @$session-id))]
+      (let [{:keys [status body exception]} (<!! (api/get-session repo @en-it @$session-id))]
         (is (= :ok status))
-        (let [{:keys [id lesson-id user correct total done]} body]
+        (let [{:keys [id lesson-id name user correct total done]} body]
           (is (= @$session-id id))
           (is (= @$lesson-id lesson-id))
+          (is (= "Beginner" name))
           (is (= "mike" user))
           (is (= 0 correct))
           (is (= 0 total))
@@ -535,15 +527,16 @@
 
       (let [{:keys [status body]} (<!! (api/get-sessions repo @en-it))]
         (is (= :ok status))
-        (is (= [{:id @$session-id
-                 :user "mike"
-                 :correct 0
-                 :total 0
-                 :length 3
-                 :done false
-                 :lesson-id @$lesson-id
-                 :entity-id @$entity-id}]
-               (mapv no-dates body))))
+        (is (= 1 (count body))))
+      (let [{:keys [status body]} (<!! (api/get-sessions-for-user repo @en-it {}))]
+        (is (= :ok status))
+        (is (= 1 (count body))))
+      (let [{:keys [status body]} (<!! (api/get-sessions-for-user repo @en-it {:done false}))]
+        (is (= :ok status))
+        (is (= 1 (count body))))
+      (let [{:keys [status body]} (<!! (api/get-sessions-for-user repo @en-it {:done true}))]
+        (is (= :ok status))
+        (is (= 0 (count body))))
 
       (let [{:keys [status body exception]} (<!! (api/record-answer! repo @en-it @$session-id @$entity-id :english false))]
         (is (= :ok status))
@@ -577,13 +570,26 @@
 
       (let [{:keys [status body]} (<!! (api/get-session repo @en-it @$session-id))]
         (is (= :ok status))
-        (let [{:keys [id lesson-id user correct total done]} body]
+        (let [{:keys [id lesson-id user correct total done start name description]} body]
           (is (= @$session-id id))
           (is (= @$lesson-id lesson-id))
           (is (= "mike" user))
           (is (= 2 correct))
           (is (= 3 total))
           (is done)))
+
+      (let [{:keys [status body]} (<!! (api/get-sessions repo @en-it))]
+        (is (= :ok status))
+        (is (= 1 (count body))))
+      (let [{:keys [status body]} (<!! (api/get-sessions-for-user repo @en-it {}))]
+        (is (= :ok status))
+        (is (= 1 (count body))))
+      (let [{:keys [status body]} (<!! (api/get-sessions-for-user repo @en-it {:done false}))]
+        (is (= :ok status))
+        (is (= 0 (count body))))
+      (let [{:keys [status body]} (<!! (api/get-sessions-for-user repo @en-it {:done true}))]
+        (is (= :ok status))
+        (is (= 1 (count body))))
 
       (let [{:keys [status body]} (<!! (api/delete-lesson! repo @en-it @$entity-id))]
         (is (= :ok status)))
@@ -594,14 +600,3 @@
 
       (is (= {:status :ok} (<!! (api/delete-type! repo @en-it))))      
       (tear-down!))))
-
-;; TODO: move to dynamite
-(defn get-table-names
-  [db]
-  (map :table_name (jdbc/with-db-metadata [md db]
-       (jdbc/metadata-result (.getTables md nil nil nil (into-array ["TABLE" "VIEW"]))))))
-
-(defn drop-all-tables!
-  [db]
-  (doseq [table-name (get-table-names db)]
-    (jdbc/execute! db [(str "drop table " table-name)])))

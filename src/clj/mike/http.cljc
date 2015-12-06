@@ -23,7 +23,7 @@
 
   (pet [_ url request]
     #?(:clj (go (wrap-response (http/put url (wrap-request request))))
-            :cljs (wrap-response (http/put url (wrap-request request)))))
+       :cljs (wrap-response (http/put url (wrap-request request)))))
   
   (post [_ url request]
     #?(:clj (go (wrap-response (http/post url (wrap-request request))))
@@ -49,7 +49,6 @@
 
 (defn json-response-body
   [{:keys [status body] :as response}]
-  (println "BODY: " body)
   (if (blank? body)
     response
     (update response :body (comp keywordize-keys from-json))))

@@ -4,6 +4,8 @@ have access to a webservice REPL while working on a UI is awesome
 
 SSL
 
+remove extra js from resources/public
+
 USEFUL FUNCTIONS;
 clojure.core.select-keys
 clojure.core.ex-info, clojure.core.ex-data
@@ -17,3 +19,14 @@ CREATE DATABASE `entity` CHARACTER SET utf8 COLLATE utf8_general_ci;
 lein clean; lein with-profile type figwheel
 
 lein clean; lein with-profile production figwheel
+
+Performance
+
+add entity to lesson is slow
+
+
+Things
+
+Clear Add Entity form when switching lessons
+Paging
+When creating a session with an invalid lesson ID, the incorrect message "Lesson is empty" is returned

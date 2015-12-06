@@ -33,7 +33,6 @@
                  [cljs-http "0.1.37"]
 
                  [figwheel "0.3.7"]]
-  :hooks [leiningen.cljsbuild]
   :plugins [[lein-ring "0.8.12"]
             [lein-beanstalk "0.2.7"]
             [cider/cider-nrepl "0.9.1"]

@@ -107,4 +107,3 @@
   (create-current-type-table! config)
   (create-user! config "admin" "admin" true)
   (create-user! config "mike" "mike" false))
-

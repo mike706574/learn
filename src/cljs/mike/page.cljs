@@ -85,7 +85,7 @@
          [:div.row (render state)])])))
 
 (defn page2
-  [state title reload]
+  [state title]
   (let [{:keys [loading loading-target error body mode modes] :as current-state} @state
         {:keys [title label secondary render]} (get modes mode)]
     (if (= mode :fatal)
@@ -93,17 +93,8 @@
        [:div.row
         [:div.col-lg-12
          [:h1.page-header "A fatal error appears!"]
-         [:h5 "Body: " body]
-         [:input.btn.btn-default {:type "button"
-                                  :value "Reload"
-                                  :on-click reload}]]]]
-      (if loading
-        [:div.container-fluid
-         [:div.row
-          [:div.col-lg-12
-           [:h1.page-header title]
-           (when loading (c/loading-header loading-target))]]]
-        [:div.container-fluid
+         [:h5 "Body: " body]]]]
+      [:div.container-fluid
          [:div.row
           [:div.col-lg-12
            (if secondary
@@ -113,11 +104,17 @@
             (conj
              (map
               (fn [[k v]]
-                (if (= k mode) 
-                  [:span.btn.btn-primary {:key k :on-click identity} (:title v)]
-                  [:span.btn.btn-default {:key k :on-click
-                                          #(s/mode! state k)} (:title v)])) modes)
+                (let [{:keys [title on-load]} v]
+                  (if (= k mode) 
+                    [:span.btn.btn-primary {:key k :on-click identity} title]
+                    [:span.btn.btn-default
+                     {:key k :on-click (fn []
+                                         (when on-load (on-load state))
+                                         (s/mode! state k))} title]))) modes)
              [:a.btn.btn-default {:key "dashboard" :href "/"} [:span.glyphicon.glyphicon-home]])]
-           (println "BODY:" body)
-           (c/message-box error body)
-           (render state)]]]))))
+           (if loading
+             (when loading (c/loading-header loading-target))
+             [:div
+              ;; TODO: make closable?
+              (c/message-box error body)
+              (render state)])]]])))

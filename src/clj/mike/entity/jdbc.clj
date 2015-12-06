@@ -1,21 +1,17 @@
 (ns mike.entity.jdbc
   (:refer-clojure :exclude [replace])
   (:require [mike.dynamite :as d]
+            [mike.misc :as m]
+            [mike.jaguar :as j]
             [mike.entity.api :refer [EntityRepo]]
             [clojure.string :refer [join replace]]
-            [clojure.core.async :refer [go]]
+            [clojure.core.async :refer [go <!!]]
             [clojure.java.jdbc :as jdbc]
             [clojure.set :refer [rename-keys]]
             [clojure.walk :refer [keywordize-keys]]
             [clj-time.core :as time]
             [clj-time.coerce :as coerce])
   (:import [org.apache.commons.lang3 StringUtils]))
-
-(defn now []
-  (coerce/to-date (time/now)))
-
-;; TODO: find homes
-(defn mapm [f coll] (into {} (map f coll)))
 
 ;; TODO: what does this do? somebody probably already done
 (defn replace-key
@@ -180,6 +176,7 @@
                      "(id int not null auto_increment, "
                      "lesson_id int not null, "
                      "entity_id int not null, "
+                     "entity_start varchar(64), "
                      "user varchar(32) not null, "
                      "correct int not null, "
                      "total int not null, "
@@ -212,7 +209,7 @@
     (let [type-info (-> type-spec
                         (dissoc :attributes)
                         (assoc :user user
-                               :created (now)))
+                               :created (j/now)))
           type-id (d/insert! conn type-table type-info)
           attribute-specs (:attributes type-spec)
           attributes (map #(-> %
@@ -283,7 +280,7 @@
 (defn get-types
   [config]
   (let [type-ids (jdbc/query config ["select id from types"] :row-fn :id)]
-    {:status :ok :body (mapm (fn [type-id] [type-id (select-type config type-id)]) type-ids)}))
+    {:status :ok :body (m/mapm (fn [type-id] [type-id (select-type config type-id)]) type-ids)}))
 
 (deft count-entities
   [config type-id]
@@ -304,7 +301,7 @@
   (let [table (entity-table type-id)
         row-count (d/count-rows config table )
         entity-id (inc row-count)
-        prepared-entity (dissoc (assoc entity :user user :id entity-id :created (now)) :type-id)
+        prepared-entity (dissoc (assoc entity :user user :id entity-id :created (j/now)) :type-id)
         result (jdbc/insert! config table prepared-entity)]
     (d/get-row-by-id config table :id entity-id)))
 
@@ -370,7 +367,7 @@
     (if (has-tag? config type-id  entity-id tag)
       {:status :exists}
       (let [table (tag-table type-id)]
-        (jdbc/insert! config table {:id entity-id :tag tag :created (now)})
+        (jdbc/insert! config table {:id entity-id :tag tag :created (j/now)})
         {:status :ok :body {:entity entity :tag tag}}))
     {:status :missing}))
 
@@ -487,13 +484,13 @@
 (deft create-lesson!
   [config type-id user lesson]
   (let [row-count (d/count-rows config (lesson-table type-id))
-        prepared-lesson (assoc lesson :user user :created (now))
+        prepared-lesson (assoc lesson :user user :created (j/now))
         lesson-id (d/insert! config (lesson-table type-id) prepared-lesson)]
     {:status :ok :body (select-lesson-info config type-id lesson-id)}))
 
 (deft add-to-lesson!
   [config type-id lesson-id entity-id]
-  (jdbc/insert! config (lesson-entity-table type-id) {:lesson lesson-id :entity entity-id :created (now)})
+  (jdbc/insert! config (lesson-entity-table type-id) {:lesson lesson-id :entity entity-id :created (j/now)})
   {:status :ok})
 
 (deft remove-from-lesson!
@@ -503,27 +500,56 @@
 
 (defn parse-session
   [session]
-  (rename-keys session {:lesson_id :lesson-id :entity_id :entity-id}))
+  (rename-keys session {:lesson_id :lesson-id :entity_id :entity-id :entity_start :entity-start}))
+
+(defn add-lesson-name
+  [config type-id session]
+  (let [lesson-info (select-lesson-info config type-id (:lesson-id session))
+        lesson-name (:name lesson-info)]
+    (assoc session :lesson-name lesson-name)))
+
+(defn add-lesson-names
+  [config type-id sessions] 
+  (let [lessons (d/select-all config (lesson-table type-id))
+        lesson-map (m/mapm (fn [lesson] [(:id lesson) lesson]) lessons)]
+    (map #(assoc % :lesson-name (:name (get lesson-map (:lesson-id %)))) sessions)))
+
+(defn session-query
+  [type-id]
+  (str "select s.id, s.user, s.created, s.modified, s.done, s.correct, s.total, s.entity_id as `entity-id`, s.entity_start as `entity-start`, l.id as `lesson-id`, l.name, l.description, l.start, l.length from " (session-table type-id) " as s LEFT JOIN " (lesson-table type-id) " as l on s.lesson_id = l.id"))
 
 (defn select-session
-  [config type-id session-id]
-  (let [row (d/select-by-id config (session-table type-id) session-id)]
-    (parse-session row)))
+  [config type-id id]
+  (first (jdbc/query config [(str (session-query type-id) " where s.id = ?") id])))
 
 (deft get-session
   [config type-id id]
-  (let [session (select-session config type-id id)]
-    (if session
-      {:status :ok :body session}
-      {:status :missing :body (str "No session of type " type-id " found with ID " id)})))
+  (if-let [session (select-session config type-id id)]
+    {:status :ok :body session}
+    {:status :missing :body (str "No session of type " type-id " found with ID " id)}))
 
 (deft get-sessions
-  [config type-id user-id]
-  {:status :ok :body (d/select-all config (session-table type-id) :row-fn parse-session)})
+  [config type-id user-id] 
+  {:status :ok :body (jdbc/query config [(session-query type-id)])})
+
+(def entity-db {:subprotocol "mysql"
+                :subname "//localhost:3306/entity_dev"
+                :user "root"
+                :password "goose"})
+
+
+
 
 (deft get-sessions-for-user
-  [config type-id user-id] 
-  {:status :ok :body (d/select-equal config (session-table type-id) :user user-id)})
+  [config type-id user-id {:keys [done] :as things}]
+  (if (nil? done)
+    {:status :ok :body (jdbc/query config [(str (session-query type-id) " where s.user = ?") user-id])}
+    
+    {:status :ok :body (jdbc/query config [(str (session-query type-id) " where s.user = ? and s.done = ?") user-id (j/parse-boolean done)])}))
+
+(deft get-completed-sessions-for-user
+  [config type-id user-id]
+    {:status :ok :body (jdbc/query config [(str (session-query type-id) " where s.user = ? and s.done = ?") user-id false])})
 
 (defn get-random-lesson-entity-id
   [config type-id lesson-id]
@@ -532,22 +558,33 @@
       nil
       (rand-nth lesson-entity-ids))))
 
+(defn get-entity-start
+  [config type-id start]
+  (if start
+    start
+    (let [type (select-type config type-id)
+          attributes (:attributes type)
+          ids (map :id attributes)]
+      (rand-nth ids))))
+
 (deft create-session!
   [config type-id user lesson-id]
-  (let [info (select-lesson-info config type-id lesson-id)
-        entity-id (get-random-lesson-entity-id config type-id lesson-id)]
+  (let [{:keys [name start length]} (select-lesson-info config type-id lesson-id)
+        entity-id (get-random-lesson-entity-id config type-id lesson-id)
+        entity-start (get-entity-start config type-id start)]
     (if entity-id
       (let [session {:lesson_id lesson-id
                      :entity_id entity-id
+                     :entity_start entity-start
                      :user user
                      :correct 0
                      :total 0
-                     :length (:length info)
+                     :length length
                      :done 0
-                     :created (now)}
-            session-id (d/insert! config (session-table type-id) session)]
+                     :created (j/now)}
+            session-id (d/insert! config (session-table type-id) session)] 
         {:status :ok :body (select-session config type-id session-id)})
-      {:status :bad :body "Empty lesson!"})))
+      {:status :bad :body (str "Lesson " name " is empty!" )})))
 
 (defn record-entity-answer!
   [config type-id entity-id user start correct?]
@@ -558,35 +595,43 @@
         row (first (jdbc/query config [query entity-id user start]))]
     (if (nil? row)
       (let [correct (if correct? 1 0)]
-        (jdbc/insert! config table {:id entity-id :user user :correct correct :total 1 :start start :created (now)}))
+        (jdbc/insert! config table {:id entity-id :user user :correct correct :total 1 :start start :created (j/now)}))
       (let [previous (:correct row)
             correct (if correct? (inc previous) previous) 
-            total (inc (:total row))] 
+            total (inc (:total row))]
         (jdbc/update! config table {:correct correct :total total} ["id = ? and user = ? and start = ?" entity-id user start])))))
 
 (deft record-individual-answer!
-  [config type-id entity-id user start correct?]
+  [config type-id entity-id user start correct?]select-session
   (record-entity-answer! config type-id entity-id user start correct?)
   {:status :ok})
 
 (deft record-answer!
-  [config type-id user session-id entity-id start correct?]
+  [config type-id user session-id entity-id entity-start correct?]
+  (println "record-answer!")
+  (println "Session:" session-id)
+  (println entity-id)
   (let [{done? :done session-entity-id :entity-id :as session} (select-session config type-id session-id)]
+    (println "DONE?" done?)
     (cond
       (nil? session) {:status :what :body "TODO: no session"}
       done? {:status :what :body "TODO: already done?"}
-      (not= entity-id session-entity-id) {:status :what :body "TODO: entity mismatch?"}
-      :else (let [{:keys [total length correct lesson-id]} session
+      (not= entity-id session-entity-id) {:status :invalid :body
+                                          (str "Expected entity " session-entity-id " but got " entity-id)}
+      :else (let [{:keys [total length correct lesson-id start]} session
                   total (inc total)
                   correct (if correct? (inc correct) correct)
                   done? (= total length)
                   table (session-table type-id)
+                  new-start (get-entity-start config type-id start)
                   new-entity-id (get-random-lesson-entity-id config type-id lesson-id)]
               (jdbc/update! config table {:correct correct
                                           :total total
                                           :done done?
-                                          :entity_id new-entity-id} ["id = ?" session-id])
-              (record-entity-answer! config type-id entity-id user start correct?)
+                                          :entity_id new-entity-id} ["id = ?" session-id]
+                                          :entity_start new-start)
+              (println entity-start)
+              (record-entity-answer! config type-id entity-id user entity-start correct?)
               {:status :ok :body (select-session config type-id session-id)}))))
 
 (deft get-stats
@@ -638,7 +683,8 @@
   (delete-lesson! [_ type-id lesson-id]
     (delete-lesson! config type-id lesson-id))
   (add-to-lesson! [_ type-id lesson-id entity-id] (add-to-lesson! config type-id lesson-id entity-id))
-  (remove-from-lesson! [_ type-id lesson-id entity-id] (remove-from-lesson! config type-id lesson-id entity-id))
+  (remove-from-lesson! [_ type-id lesson-id entity-id]
+    (remove-from-lesson! config type-id lesson-id entity-id))
 
   (create-session! [_ type-id lesson-id] (create-session! config type-id user lesson-id))
   (record-answer! [_ type-id session-id entity-id start correct?] 
@@ -646,7 +692,7 @@
   (get-session [_ type-id session-id] (get-session config type-id session-id))
 
   (get-sessions [_ type-id] (get-sessions config type-id user))
-  (get-sessions-for-user [_ type-id user-id] (get-sessions-for-user config type-id user))
+  (get-sessions-for-user [_ type-id criteria] (get-sessions-for-user config type-id user criteria))
   
   (record-individual-answer! [_ type-id entity-id start correct?]
     (record-individual-answer! config type-id entity-id user start correct?))

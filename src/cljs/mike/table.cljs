@@ -7,7 +7,10 @@
   (let [f (nth column 3)
         template (nth column 4)
         args (if (vector? template)
-               (map #(if (keyword? %) (% row) %) template)
+               (map #(cond
+                       (keyword? %) (% row)
+                       (fn? %) (% row)
+                       :else %) template)
                (vector template row))]
     #(apply f args)))
 
@@ -16,6 +19,7 @@
   (let [[type k label] col]
     [:td {:key label}
      (case type
+       ;; WORKS WITH ANY FUNCTION ACCIDENTALLY
        :property (let [k (second col)]
                    (k row))
        :action [:input.btn.btn-default {:type "button"
@@ -31,11 +35,7 @@
         k (second col)]
     [:th {:key k}
      (case type
-       ;; todo: dedupe
        :property (if (= (count col) 3)
-                   (m/third col) 
-                   (labelize k))
-       :function (if (= (count col) 3)
                    (m/third col) 
                    (labelize k))
        :action "")]))
