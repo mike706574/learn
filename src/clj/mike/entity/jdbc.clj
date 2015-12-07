@@ -12,13 +12,6 @@
             [clj-time.coerce :as coerce])
   (:import [org.apache.commons.lang3 StringUtils]))
 
-;; TODO: what does this do? somebody probably already done
-(defn replace-key
-  [m old-key new-key f]
-  (let [old-value (get m old-key)
-        old-removed (dissoc m old-key)]
-    (assoc old-removed new-key (f old-value))))
-
 (def attribute-table "attributes")
 (def type-table "types")
 
@@ -229,9 +222,8 @@
   [config type-id]
   (let [query "select * from attributes where type = ?"
         attributes (jdbc/query config [query type-id])
-        attributes (into [] (map (fn [attribute]
-                                   (replace-key (dissoc attribute :type) :schema_id :schema get-schema)))
-                         attributes)
+        attributes (mapv #(-> % (update :schema_id get-schema)
+                                (dissoc :schema :type)) attributes)
         query "select * from types where id = ?"
         info (first (jdbc/query config [query type-id]))]
     (assoc info :id type-id :attributes attributes)))
