@@ -8,17 +8,9 @@
             [clojure.core.async :refer [go <!!]]
             [clojure.java.jdbc :as jdbc]
             [clojure.set :refer [rename-keys]]
-            [clojure.walk :refer [keywordize-keys]]
             [clj-time.core :as time]
             [clj-time.coerce :as coerce])
   (:import [org.apache.commons.lang3 StringUtils]))
-
-;; TODO: what does this do? somebody probably already done
-(defn replace-key
-  [m old-key new-key f]
-  (let [old-value (get m old-key)
-        old-removed (dissoc m old-key)]
-    (assoc old-removed new-key (f old-value))))
 
 (def attribute-table "attributes")
 (def type-table "types")
@@ -230,9 +222,8 @@
   [config type-id]
   (let [query "select * from attributes where type = ?"
         attributes (jdbc/query config [query type-id])
-        attributes (into [] (map (fn [attribute]
-                                   (replace-key (dissoc attribute :type) :schema_id :schema get-schema)))
-                         attributes)
+        attributes (mapv #(-> % (update :schema_id get-schema)
+                                (dissoc :schema :type)) attributes)
         query "select * from types where id = ?"
         info (first (jdbc/query config [query type-id]))]
     (assoc info :id type-id :attributes attributes)))
@@ -498,22 +489,6 @@
   (jdbc/delete! config (lesson-entity-table type-id) ["lesson = ? and entity = ?" lesson-id entity-id])
   {:status :ok})
 
-(defn parse-session
-  [session]
-  (rename-keys session {:lesson_id :lesson-id :entity_id :entity-id :entity_start :entity-start}))
-
-(defn add-lesson-name
-  [config type-id session]
-  (let [lesson-info (select-lesson-info config type-id (:lesson-id session))
-        lesson-name (:name lesson-info)]
-    (assoc session :lesson-name lesson-name)))
-
-(defn add-lesson-names
-  [config type-id sessions] 
-  (let [lessons (d/select-all config (lesson-table type-id))
-        lesson-map (m/mapm (fn [lesson] [(:id lesson) lesson]) lessons)]
-    (map #(assoc % :lesson-name (:name (get lesson-map (:lesson-id %)))) sessions)))
-
 (defn session-query
   [type-id]
   (str "select s.id, s.user, s.created, s.modified, s.done, s.correct, s.total, s.entity_id as `entity-id`, s.entity_start as `entity-start`, l.id as `lesson-id`, l.name, l.description, l.start, l.length from " (session-table type-id) " as s LEFT JOIN " (lesson-table type-id) " as l on s.lesson_id = l.id"))
@@ -532,19 +507,10 @@
   [config type-id user-id] 
   {:status :ok :body (jdbc/query config [(session-query type-id)])})
 
-(def entity-db {:subprotocol "mysql"
-                :subname "//localhost:3306/entity_dev"
-                :user "root"
-                :password "goose"})
-
-
-
-
 (deft get-sessions-for-user
   [config type-id user-id {:keys [done] :as things}]
   (if (nil? done)
     {:status :ok :body (jdbc/query config [(str (session-query type-id) " where s.user = ?") user-id])}
-    
     {:status :ok :body (jdbc/query config [(str (session-query type-id) " where s.user = ? and s.done = ?") user-id (j/parse-boolean done)])}))
 
 (deft get-completed-sessions-for-user
