@@ -260,7 +260,7 @@
 (deft delete-type!
   [config type-id]
   (if (type-exists? config type-id)
-    (jdbc/with-db-connection [conn config]
+    (jdbc/with-db-transaction [conn config]
       (try 
         (d/drop-tables! config [(session-table type-id)
                                   (answer-table type-id)

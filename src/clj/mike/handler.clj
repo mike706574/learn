@@ -25,7 +25,7 @@
   (:import [mike.entity.jdbc JdbcEntityRepo]
            [mike.entity.http HttpEntityRepo]))
 
-(def environment "dev")
+(def environment "prod")
 (def config (c/load environment))
 (def api-url (:api-url config))
 (def auth-db (:auth-database config))
@@ -82,7 +82,20 @@
                      nil)
         (throw (ex-info "Error fetching user type!" result))))))
 
-(defroutes api-routes  
+(defroutes api-routes
+  (POST "/api/noodle"
+        {sentences :body :as request}
+        
+        
+        )
+  
+
+
+  
+
+
+
+  
   (POST "/api/type"
         {body :body :as request}
         (to-response
@@ -199,9 +212,10 @@
         request))
 
   ;; TODO: think about this
-  (cr/not-found {:status 200
-                 :headers {"Content-Type" "application/json"}
-                 :body (json/write-str {:message "NOT FOUND"})}))
+)
+(cr/not-found {:status 200
+               :headers {"Content-Type" "application/json"}
+               :body (json/write-str {:message "NOT FOUND"})})
 
 (defn flash-redirect
   [path message]

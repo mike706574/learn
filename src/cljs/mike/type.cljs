@@ -160,7 +160,7 @@
                                                        (create-type! state))}]]]]))
 (defn app
   [api-url username type-id]
-  (println "Initializing... " {:api-url api-url :username username :type-id type-id})
+;;  (println "Initializing... " {:api-url api-url :username username :type-id type-id})
   (reset! repo (HttpEntityRepo. api-url username "friend"))
   (let [state (r/atom {:user username
                        :mode :browse
@@ -171,13 +171,13 @@
     (s/batch! state [[s/Channel :types api/get-types [@repo]]
                      [s/Value :loading false]])
     (fn []
-      (println "Rendering...")
+;;      (println "Rendering...")
       (p/page2 state "Types"))))
 
 (defn ^:export start [api-url username type-id]
-  (println "Starting app...")
+;;  (println "Starting app...")
   (r/render [(partial app api-url username type-id)] (js/document.getElementById "page-wrapper")))
 
 (defn ^:export reload []
-  (println "Reloading app...") 
+;;  (println "Reloading app...") 
   (r/render [(partial app "http://localhost:8080/api/" "mike" 1)] (js/document.getElementById "page-wrapper")))

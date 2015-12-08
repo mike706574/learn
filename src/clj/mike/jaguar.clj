@@ -34,3 +34,8 @@
     "true" true
     "false" false
     (throw (ex-info "I don't even know."))))
+
+(defn lines
+  [path]
+  (with-open [rdr (clojure.java.io/reader path)]
+    (doall (line-seq rdr))))

@@ -166,7 +166,7 @@
 
 (defn app
   [api-url username type-id]
-  (println "Initializing... " {:api-url api-url :username username :type-id type-id})
+;;  (println "Initializing... " {:api-url api-url :username username :type-id type-id})
   (reset! repo (HttpEntityRepo. api-url username "friend"))
   (let [state (r/atom {:user username
                        :mode :home
@@ -182,15 +182,15 @@
                                         :render render-create}}})]
     (load-lessons! state)
     (fn []
-      (println "Rendering mode" (:mode @state) "...")
+;;      (println "Rendering mode" (:mode @state) "...")
       (p/page2 state "Lessons"))))
 
-(def info (partial println "[Lesson]"))
+;; (def info (partial println "[Lesson]"))
 
 (defn ^:export start [api-url username type-id]
-  (info "[Lesson] Starting app...")
+;;  (info "[Lesson] Starting app...")
   (r/render [(partial app api-url username type-id)] (js/document.getElementById "page-wrapper")))
 
 (defn ^:export reload []
-  (info "[Lesson] Reloading app...")
+;;  (info "[Lesson] Reloading app...")
   (r/render [(partial app "http://localhost:8080/api/" "mike" 1)] (js/document.getElementById "page-wrapper")))

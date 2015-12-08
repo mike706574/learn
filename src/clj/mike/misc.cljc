@@ -57,3 +57,7 @@
         (if (= next-index (count v))
           (first v)
           (get v next-index))))))
+
+(defn cite
+  [& args]
+  (str "\"" (apply str args) "\""))

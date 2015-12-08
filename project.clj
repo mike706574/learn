@@ -40,12 +40,13 @@
             
             [lein-cljsbuild "1.0.6"]
             [lein-figwheel "0.3.7"]]
+
   :ring {:handler mike.handler/app
          :init mike.handler/init
          :destroy mike.handler/destroy}
   :source-paths ["src/clj" "src/cljc"]
   :test-paths ["test/clj"]
-
+ 
   :profiles {:uberjar {:aot :all}
              :production {:ring {:open-browser? false
                                  :stacktraces? false

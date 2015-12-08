@@ -27,19 +27,17 @@
 (defn answer-question!
   [state correct?]
   ;; TODO: hacky
-  (if (:loading-question @state)
-    (println "Tried to answer question while still loading!")
-    (do 
-      (swap! state assoc :loading-question true)
-      (s/batch! state [[s/Value :loading-question true]
-                       [s/Channel :session api/record-answer! [:repo
-                                                               :type-id
-                                                               [:session :id]
-                                                               [:session :entity-id]
+  (when (not (:loading-question @state)) 
+    (swap! state assoc :loading-question true)
+    (s/batch! state [[s/Value :loading-question true]
+                     [s/Channel :session api/record-answer! [:repo
+                                                             :type-id
+                                                             [:session :id]
+                                                             [:session :entity-id]
                                                                [:session :entity-start] correct?]]
-                       [s/Channel :entity api/get-entity [:repo :type-id [:session :entity-id]]]
-                       [s/Function :current :entity-start [:session :entity-start]]
-                       [s/Value :loading-question false]]))))
+                     [s/Channel :entity api/get-entity [:repo :type-id [:session :entity-id]]]
+                     [s/Function :current :entity-start [:session :entity-start]]
+                     [s/Value :loading-question false]])))
 
 (defn session!
   [state session]
@@ -66,9 +64,7 @@
   [state]
 
   (let [{:keys [type current]} @state
-        _   (println "FLIPPING" current)
         {:keys [attributes]} type
-        _ (println attributes)
         current-attribute (m/find-first #(= current (:id %)) attributes)
         next (:id (m/get-after attributes current-attribute))]
     (swap! state assoc :current next)))
@@ -216,7 +212,7 @@
 
 (defn app
   [api-url username type-id]
-  (println "Initializing... " {:api-url api-url :username username :type-id type-id})
+;;  (println "Initializing... " {:api-url api-url :username username :type-id type-id})
   (let [state (r/atom {:user username
                        :repo (HttpEntityRepo. api-url username "friend")
                        :mode :sessions
@@ -236,15 +232,15 @@
                        })]
     (load-sessions! state)
     (fn []
-      (println "Rendering mode" (:mode @state) "...")
+;;      (println "Rendering mode" (:mode @state) "...")
       (p/page2 state "Flashcards"))))
 
-(def info (partial println "[Flash]"))
+;; (def info (partial println "[Flash]"))
 
 (defn ^:export start [api-url username type-id]
-  (info "Starting app...")
+;;  (info "Starting app...")
   (r/render [(partial app api-url username type-id)] (js/document.getElementById "page-wrapper")))
 
 (defn ^:export reload []
-  (info "Reloading app...")
+;;  (info "Reloading app...")
   (r/render [(partial app "http://localhost:8080/api/" "mike" 1)] (js/document.getElementById "page-wrapper")))

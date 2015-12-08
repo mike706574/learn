@@ -5,8 +5,7 @@
                     :cljs [cljs.core.async :refer [<!]])
             [mike.entity.api :as api :refer [EntityRepo]]
             [mike.http :refer [fun-client] :as http]
-            #?(:clj [clojure.data.json :as json])
-            [clojure.string :refer [join blank?]]
+            [clojure.string :refer [join]]
             [clojure.walk :refer [keywordize-keys]]))
 
 (defn unkey [x] (if (keyword? x) (name x) x))
