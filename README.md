@@ -1,7 +1,15 @@
-# mike
+# learn
 
-clojure playground
+clojure playground/hacked together webapp for learning stuff
 
-## Building and running
+stuff used:
+  * [clojure](https://github.com/clojure)
+  * [ring](https://github.com/ring-clojure)
+  * [compojure](https://github.com/weavejester/compojure)
+  * [friend](https://github.com/cemerick/friend)
+  * [reagent](https://github.com/reagent-project)
+  * [startbootstrap-cleansb-admin2](https://github.com/IronSummitMedia/startbootstrap-sb-admin-2)
 
-i don't know
+## building and running
+
+todo
