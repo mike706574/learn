@@ -8,7 +8,7 @@ stuff used:
   * [compojure](https://github.com/weavejester/compojure)
   * [friend](https://github.com/cemerick/friend)
   * [reagent](https://github.com/reagent-project)
-  * [startbootstrap-cleansb-admin2](https://github.com/IronSummitMedia/startbootstrap-sb-admin-2)
+  * [startbootstrap-sb-admin2](https://github.com/IronSummitMedia/startbootstrap-sb-admin-2)
 
 ## building and running
 
